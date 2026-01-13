@@ -1,0 +1,195 @@
+/* Base Reset & Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+:root {
+    --crt-color: #ffb000;
+    /* Amber monochrome default */
+    --crt-bg: #1a1200;
+    --scanline-color: rgba(0, 0, 0, 0.5);
+    --flicker-anim: flicker 0.15s infinite;
+}
+
+body,
+html {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    background: #000;
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    cursor: none;
+    /* Hide default cursor */
+    user-select: none;
+}
+
+/* CRT Overlay Layers */
+.crt-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 100;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 2px, 3px 100%;
+    box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.9);
+    /* Vignette */
+}
+
+.scanline {
+    width: 100%;
+    height: 100px;
+    z-index: 100;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(255, 176, 0, 0.1) 50%, rgba(0, 0, 0, 0) 100%);
+    opacity: 0.1;
+    position: absolute;
+    bottom: 100%;
+    animation: scanline 8s linear infinite;
+    pointer-events: none;
+}
+
+/* System Interface (HUD) */
+#system-interface {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    box-sizing: border-box;
+    z-index: 50;
+    color: var(--crt-color);
+    text-shadow: 0 0 4px var(--crt-color), 0 0 10px var(--crt-color);
+    pointer-events: none;
+    mix-blend-mode: screen;
+}
+
+#header-bar {
+    width: 100%;
+    border-bottom: 2px solid var(--crt-color);
+    padding-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+#status-display {
+    position: absolute;
+    top: 60px;
+    left: 20px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.status-ok {
+    color: var(--crt-color);
+}
+
+.status-warn {
+    color: #ff3300;
+    animation: blink 1s infinite;
+}
+
+#log-container {
+    position: absolute;
+    bottom: 40px;
+    left: 20px;
+    font-size: 1rem;
+    max-width: 600px;
+    pointer-events: none;
+}
+
+/* CINEMATIC MESSAGES */
+#voice-overlay {
+    position: absolute;
+    top: 30%;
+    /* Upper-Mid */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    text-align: center;
+    pointer-events: none;
+    z-index: 50;
+
+    /* Ghost Text */
+    font-size: 24px;
+    font-weight: 300;
+    letter-spacing: 4px;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+
+    /* Transition for new messages */
+    transition: opacity 0.5s;
+}
+
+.log-entry {
+    margin-bottom: 5px;
+    opacity: 0.8;
+}
+
+.voice-entry {
+    margin-bottom: 15px;
+    opacity: 0;
+    animation: textFadeIn 4s forwards;
+    letter-spacing: 4px;
+    color: var(--crt-color);
+}
+
+@keyframes textFadeIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    10% {
+        opacity: 1;
+        transform: scale(1.0);
+    }
+
+    80% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+#reticle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 4px;
+    height: 4px;
+    background: var(--crt-color);
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 4px var(--crt-color);
+}
+
+/* Animations */
+@keyframes scanline {
+    0% {
+        bottom: 100%;
+    }
+
+    100% {
+        bottom: -100%;
+    }
+}
+
+@keyframes blink {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.2;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}

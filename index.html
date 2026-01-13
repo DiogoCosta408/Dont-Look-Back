@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DON'T LOOK BACK</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Courier New', monospace;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* TIMER GLITCH EFFECT */
+        .glitch-text {
+            animation: glitch-anim 0.3s infinite;
+        }
+
+        @keyframes glitch-anim {
+            0% {
+                transform: translate(0);
+            }
+
+            20% {
+                transform: translate(-2px, 2px);
+            }
+
+            40% {
+                transform: translate(-2px, -2px);
+            }
+
+            60% {
+                transform: translate(2px, 2px);
+            }
+
+            80% {
+                transform: translate(2px, -2px);
+            }
+
+            100% {
+                transform: translate(0);
+            }
+        }
+
+        /* FADE OVERLAY */
+        #fade-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 5s ease-in;
+            /* Slow fade */
+            z-index: 9999;
+        }
+
+        #fade-overlay.active {
+            opacity: 1;
+        }
+
+        /* HIDDEN UI ELEMENTS (Disabled per User Request) 
+           Keeping definitions in CSS just in case, but hiding usage below.
+        */
+
+        #crt-overlay {
+            /* Keep CRT for atmosphere? User said "no virtual interface". 
+                "enter the void" implies cinematic. I'll keep CRT scanline as it's atmospheric, 
+                but remove the text overlays. */
+        }
+    </style>
+    <!-- Import Map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script>
+        window.addEventListener('error', function (e) {
+            console.error(e.message); // Log to console instead of screen
+        });
+    </script>
+</head>
+
+<body>
+    <div id="crt-overlay" class="crt-overlay">
+        <div class="scanline"></div>
+    </div>
+
+    <div id="system-interface">
+        <!-- UI DISABLED -->
+        <div id="header-bar" style="display: none;">
+            <span class="sys-text">FACILITY_OS v9.0.2</span>
+            <span class="sys-text right" id="clock">00:00:00</span>
+        </div>
+
+        <div id="status-display" style="display: none;">
+            <div class="status-item">BIO-METRICS: <span id="bio-status" class="status-ok">STABLE</span></div>
+            <div class="status-item">NEURO-SYNC: <span id="neuro-status" class="status-warn">CALIBRATING</span></div>
+            <div class="status-item">SHIFT_ID: <span id="shift-id">#894-B</span></div>
+        </div>
+
+        <div id="voice-overlay"></div>
+
+        <div id="jumpscare-overlay"
+            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 10000; align-items: center; justify-content: center; display: none;">
+            <img id="jumpscare-img" src="textures/sleep_paralysis.png"
+                style="width: 100%; height: 100%; object-fit: cover; transform: scale(0.1); transition: transform 0.2s cubic-bezier(0.1, 0.7, 1.0, 0.1);" />
+        </div>
+
+        <div id="log-container" style="display: none;">
+            <!-- Logs Hidden -->
+        </div>
+
+        <audio id="bg-music" loop>
+            <source src="audio/The Carpathians.mp3" type="audio/mpeg">
+        </audio>
+
+        <div id="reticle"></div>
+    </div>
+
+    <!-- Game Logic -->
+    <script type="module">
+        import './main.js?v=glitch_timer_v1';
+    </script>
+</body>
+
+</html>
