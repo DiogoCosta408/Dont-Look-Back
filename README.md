@@ -6,6 +6,10 @@ A first-person psychological horror experience built with Three.js.
 
 Explore an endless, procedurally generated corridor in this atmospheric horror game. The facility watches you. The lights flicker. Something doesn't feel right.
 
+## Play Now
+
+🎮 **[Play Don't Look Back](https://diogocosta408.github.io/Dont-Look-Back/)**
+
 ## Features
 
 - **Procedurally Generated Environment** - Infinite corridor generation with dynamic chunk loading and cleanup
