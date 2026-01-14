@@ -234,10 +234,7 @@ class GameClient {
                 this.enterCorridor();
             }
 
-            // EASTER EGG: Out of Bounds Jumpscare (Z > 12)
-            if (this.player.controls.getObject().position.z > 12.0) {
-                this.triggerJumpscare();
-            }
+            // EASTER EGG: Out of Bounds Jumpscare (Z > 12) REMOVED - Moved to VOID logic
 
         } else if (this.currentZone === 'CORRIDOR') {
             // [ZONE: CORRIDOR]
@@ -246,6 +243,12 @@ class GameClient {
             this.system.update(time, delta);
             this.system.updateClock(delta);
             this.generator.update(this.player.controls.getObject().position.z, delta);
+
+            // EASTER EGG: Back into the Nothingness (Z > 25)
+            // If player exits intro, turns around, and walks into the void where intro was
+            if (this.player.controls.getObject().position.z > 25.0) {
+                this.triggerJumpscare();
+            }
         }
 
         // Pass State to Player (Collisions, Effects)
