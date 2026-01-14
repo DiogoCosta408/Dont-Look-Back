@@ -1,6 +1,6 @@
 # Don't Look Back
 
-A first-person psychological horror experience built with Three.js.
+A first-person psychological experience built with Three.js.
 
 ## Overview
 
