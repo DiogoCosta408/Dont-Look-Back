@@ -6,9 +6,9 @@ A first-person psychological experience built with Three.js.
 
 Explore an endless, procedurally generated corridor in this atmospheric horror game. The facility watches you. The lights flicker. Something doesn't feel right.
 
-## Play Now
+## Try Now
 
-🎮 **[Play Don't Look Back](https://diogocosta408.github.io/Dont-Look-Back/)**
+**[Try Don't Look Back](https://diogocosta408.github.io/Dont-Look-Back/)**
 
 ## Features
 
