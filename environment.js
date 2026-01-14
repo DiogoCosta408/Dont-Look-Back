@@ -220,39 +220,161 @@ export class FacilityGenerator {
         const sofaTex = texLoader.load('textures/sofa_texture.png');
         const tableTex = texLoader.load('textures/table_texture.png');
 
-        // 1. Sofa (Converted Bed)
+        // 1. Sofa (Converted Bed) - "Futon Style" with Legs
         const sofaMat = new THREE.MeshStandardMaterial({ map: sofaTex, color: 0x888888, roughness: 0.8 });
+        const legMat = new THREE.MeshStandardMaterial({ map: dFrameTex, color: 0x5c4033, roughness: 0.9 }); // Dark wood
 
-        // Base
-        const sofaBaseGeo = new THREE.BoxGeometry(0.8, 0.5, 2.0); // Reduced width (seat depth)
+        // Dimensions
+        const seatHeight = 0.25; // Slimmer base
+        const legHeight = 0.2;
+        const totalSeatH = legHeight + seatHeight; // 0.45 top
+        const seatDepth = 0.64; // Reduced width (depth from wall) by 20%
+        const seatWidth = 2.0;
+
+        // A. Sofa Legs (x4)
+        const lg = new THREE.BoxGeometry(0.08, legHeight, 0.08);
+        const legOffsets = [
+            { x: -0.3, z: 0.8 },  // Front Left (Local to sofa center)
+            { x: -0.3, z: -0.8 }, // Back Left
+            { x: 0.3, z: 0.8 },   // Front Right
+            { x: 0.3, z: -0.8 }   // Back Right
+        ];
+
+        // Group for Sofa to keep things organized
+        const sofaGroup = new THREE.Group();
+        // Position entire group where the sofa "center base" used to be roughly
+        // Old X=-1.4. Center of seat is roughly there.
+        sofaGroup.position.set(-1.4, 0, 0.5);
+        this.introRoom.add(sofaGroup);
+
+        legOffsets.forEach(off => {
+            const l = new THREE.Mesh(lg, legMat);
+            // Pos Y: legHeight/2 (sitting on floor 0)
+            // Pos X/Z: relative to group center
+            // Seat is 0.8 deep (X axis in previous logic, wait. 
+            // Previous: Box(0.8, 0.5, 2.0).
+            // Width(X) = 0.8 (It was rotated? No, looking at walls)
+            // Wall Left is -2, Wall Right is 2.
+            // Sofa Pos: -1.4. (Near Left Wall).
+            // Dim 0.8 is likely depth from wall.
+            // Dim 2.0 is likely width along wall.
+
+            // Adjust offsets for 0.8 depth (x) and 2.0 width (z)
+            // X range: -0.4 to 0.4. Z range: -1.0 to 1.0.
+            // Let's inset legs slightly.
+            const lx = (off.x > 0 ? 0.25 : -0.25);
+            const lz = (off.z > 0 ? 0.85 : -0.85);
+
+            l.position.set(lx, legHeight / 2, lz);
+            sofaGroup.add(l);
+        });
+
+        // B. Seat Base (Floating on legs)
+        const sofaBaseGeo = new THREE.BoxGeometry(seatDepth, seatHeight, seatWidth);
         const sofaBase = new THREE.Mesh(sofaBaseGeo, sofaMat);
-        sofaBase.position.set(-1.4, 0.25, 0.5); // Shifted closer to wall
-        this.introRoom.add(sofaBase);
+        sofaBase.position.set(0, legHeight + seatHeight / 2, 0);
+        sofaGroup.add(sofaBase);
 
-        // Backrest (Vertical, slightly tilted)
-        const sofaBackGeo = new THREE.BoxGeometry(0.3, 1.2, 2.0);
+        // C. Backrest (1/3 size -> 0.4 height)
+        const backH = 0.4;
+        const sofaBackGeo = new THREE.BoxGeometry(0.15, backH, seatWidth);
         const sofaBack = new THREE.Mesh(sofaBackGeo, sofaMat);
-        // Position behind the base (Left side, towards wall)
-        sofaBack.position.set(-1.8, 0.6, 0.5);
-        sofaBack.rotation.z = 0.15; // Tilt back
-        this.introRoom.add(sofaBack);
+        // Position: At back edge of seat. Seat is 0.64 wide (-0.32 to 0.32).
+        // Back edge is -0.32. Center of backrest needs to be around -0.32 + 0.075 = -0.245.
+        // Tilted slightly.
+        sofaBack.position.set(-0.25, legHeight + seatHeight + (backH / 2) - 0.05, 0);
+        sofaBack.rotation.z = 0.1; // Slight Tilt
+        sofaGroup.add(sofaBack);
 
-        // 2. Table (Simple Box)
+        // D. Arm Rests (Rounded)
+        const armH = 0.15;
+        const armW = 0.15;
+        const armL = seatDepth + 0.05;
+
+        // Create Arm Geometry (Box + Cylinder on top for "Rounding")
+        const armBoxGeo = new THREE.BoxGeometry(armL, armH, armW);
+        const armCylGeo = new THREE.CylinderGeometry(armW / 2, armW / 2, armL, 16);
+
+        const createArm = (zPos) => {
+            const arm = new THREE.Group();
+
+            // Box Part
+            const box = new THREE.Mesh(armBoxGeo, sofaMat);
+            arm.add(box);
+
+            // Round Top
+            const round = new THREE.Mesh(armCylGeo, sofaMat);
+            round.rotation.z = Math.PI / 2; // Lay horizontal along X
+            round.position.y = armH / 2;
+            arm.add(round);
+
+            // Pos: Side of seat (Z = +/- (seatWidth/2 - armW/2))
+            // Height: On top of seat base
+            arm.position.set(0, legHeight + seatHeight + armH / 2, zPos);
+            return arm;
+        };
+
+        const leftArm = createArm(seatWidth / 2 - armW / 2);
+        sofaGroup.add(leftArm);
+
+        const rightArm = createArm(-seatWidth / 2 + armW / 2);
+        sofaGroup.add(rightArm);
+
+
+        // 2. Side Table with Drawers
         const tableMat = new THREE.MeshStandardMaterial({ map: tableTex, color: 0x888888, roughness: 0.5, metalness: 0.1 });
-        const tableGeo = new THREE.BoxGeometry(0.5, 0.6, 0.5);
-        const table = new THREE.Mesh(tableGeo, tableMat);
-        table.position.set(-1.6, 0.3, -0.9);
-        this.introRoom.add(table);
+        const drawerMat = new THREE.MeshStandardMaterial({ map: tableTex, color: 0x777777, roughness: 0.5 }); // Slightly dark for contrast
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5 });
+
+        // Main Carcass
+        // Dims: 0.5(W) x 0.6(H) x 0.5(D)
+        // Pos: -1.6, 0.3, -0.9
+        const tableGroup = new THREE.Group();
+        tableGroup.position.set(-1.6, 0.3, -0.9);
+        this.introRoom.add(tableGroup);
+
+        const tableBodyGeo = new THREE.BoxGeometry(0.5, 0.6, 0.48); // Slightly shallower to fit drawer fronts?
+        // Actually let's just make the main box the structure
+        const table = new THREE.Mesh(tableBodyGeo, tableMat);
+        tableGroup.add(table);
+
+        // Drawers (visual only - boxes on front)
+        // "Front" facing towards room center? 
+        // Table X=-1.6. Room Center X=0. Front face is +X side.
+        const numDrawers = 3;
+        const dHeight = 0.55 / numDrawers; // slightly less than full height
+        const dWidth = 0.45;
+
+        for (let i = 0; i < numDrawers; i++) {
+            // Face
+            const dGeo = new THREE.BoxGeometry(0.02, dHeight - 0.02, 0.45); // Thickness 0.02
+            const dMesh = new THREE.Mesh(dGeo, drawerMat);
+
+            // Y position: Start top, go down.
+            // Top of table is 0.3 (relative 0.3). Bottom -0.3.
+            // Let's space them.
+            const yPos = 0.2 - (i * 0.19);
+
+            dMesh.position.set(0.26, yPos, 0); // On +X face
+            tableGroup.add(dMesh);
+
+            // Handle (Simple line/pull)
+            const hGeo = new THREE.BoxGeometry(0.01, 0.01, 0.1);
+            const hMesh = new THREE.Mesh(hGeo, handleMat);
+            hMesh.position.set(0.28, yPos, 0);
+            tableGroup.add(hMesh);
+        }
 
         // 2a. Paper (Note)
         const paperTex = texLoader.load('textures/paper.png');
         const paperGeo = new THREE.PlaneGeometry(0.2, 0.3);
         const paperMat = new THREE.MeshStandardMaterial({ map: paperTex, roughness: 0.9, side: THREE.DoubleSide });
         const paper = new THREE.Mesh(paperGeo, paperMat);
-        paper.position.set(-1.6, 0.605, -0.9); // On top of table (Table H=0.6, so Top=0.6)
+        // Relative to table group which is at Y=0.3 centered. Top is 0.3 + 0.3 = 0.6.
+        paper.position.set(0, 0.305, 0);
         paper.rotation.x = -Math.PI / 2;
-        paper.rotation.z = Math.random() * 0.5 - 0.25; // Slight random angle
-        this.introRoom.add(paper);
+        paper.rotation.z = Math.random() * 0.5 - 0.25;
+        tableGroup.add(paper);
 
         // 3. Portrait (Fractal with Frame)
         const portraitLoader = new THREE.TextureLoader();

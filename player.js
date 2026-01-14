@@ -59,13 +59,13 @@ export class Player {
         });
     }
 
-    update(delta, interactables = [], pillarPositions = [], pFactor = 0, isEndgame = false, blackHolePos = null, edgeZ = null) {
+    update(delta, interactables = [], pillarPositions = [], pFactor = 0, isEndgame = false, blackHolePos = null, edgeZ = null, isIntro = false) {
         if (!this.controls.isLocked) return;
 
         this.pillarPositions = pillarPositions;
 
         // 1. [PHYSICS / MOVEMENT]
-        this.updateMovement(delta, isEndgame, blackHolePos, edgeZ);
+        this.updateMovement(delta, isEndgame, blackHolePos, edgeZ, isIntro);
 
         // 2. [BEHAVIOR TRACKING]
         this.updateMetrics(delta, interactables, blackHolePos);
