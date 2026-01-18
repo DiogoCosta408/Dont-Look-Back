@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { Player } from './player.js?v=void_physics_v3';
-import { FacilityGenerator } from './environment.js?v=endgame_vis_v4';
-import { FacilitySystem } from './facility_system.js?v=ev_reset_v2';
-import { AudioSystem } from './audio_system.js?v=v1';
+import { Player } from './player.js';
+import { FacilityGenerator } from './environment.js';
+import { FacilitySystem } from './facility_system.js';
+import { AudioSystem } from './audio_system.js';
 
 console.log("FACILITY_OS: CORE SYSTEM INITIALIZED");
 
@@ -19,9 +19,6 @@ class GameClient {
         };
 
         this.init();
-
-
-
     }
 
     init() {
@@ -59,7 +56,7 @@ class GameClient {
         // [UI SETUP]
         this.ui = {
             log: document.getElementById('log-container'),
-            neuro: document.getElementById('neuro-status'), // FIXED: Matches HTML ID
+            neuro: document.getElementById('neuro-status'),
             status: document.getElementById('status-bar')
         };
 
@@ -81,23 +78,13 @@ class GameClient {
         document.addEventListener('keydown', (e) => this.player.onKeyDown(e));
         document.addEventListener('keyup', (e) => this.player.onKeyUp(e));
 
-        // INTERACTION (Click)
-        document.addEventListener('mousedown', (e) => {
-            // Deprecated: Walk-through logic used now.
-            // Kept for potential future interaction.
-        });
-
         // RESET EVENT (Endgame Loop)
         window.addEventListener('reset-simulation', () => {
-            // "Game starts over right in the beginning"
-            // Simplest way to ensure clean state: Reload
             console.log("MAIN: Resetting Simulation...");
             window.location.reload();
         });
 
         // [AUDIO PRE-START]
-        // Browser Policy: Audio must start on user interaction.
-        // We start it here (muted) so we can fade it in cleanly later without permission errors.
         document.addEventListener('pointerlockchange', () => {
             if (document.pointerLockElement) {
                 // Unlock AudioContext but don't start music yet
@@ -121,7 +108,6 @@ class GameClient {
         this.currentZone = 'INTRO';
         this.generator.createIntroRoom();
         this.player.controls.getObject().position.set(0, 1.6, 5);
-        // Try to start immediately (if cached)
         if (this.audioSystem.startClock) this.audioSystem.startClock();
     }
 
@@ -139,9 +125,6 @@ class GameClient {
         // 1. Generate Corridor
         this.generator.createInitialCorridor();
 
-        // 2. Destroy Intro Room (Delayed cleanup possible, keeping for now)
-        // this.generator.destroyIntroRoom(); 
-
         // 3. Start & Fade In Music (From Beginning)
         if (this.musicStarted) {
             this.bgMusic.currentTime = 0;
@@ -153,8 +136,6 @@ class GameClient {
         // 4. Initial Paranoia
         this.system.paranoia = 0;
     }
-
-    // checkIntroInteraction Removed (Walk-through)
 
     triggerJumpscare() {
         if (this.jumpscareActive) return;
@@ -170,7 +151,6 @@ class GameClient {
 
         if (overlay && img) {
             overlay.style.display = 'flex';
-            // Force reflow
             void overlay.offsetWidth;
             img.style.transform = 'scale(1.0)'; // Zoom In to face
         }
@@ -197,7 +177,6 @@ class GameClient {
 
         const fadeInterval = setInterval(() => {
             currentStep++;
-            // Check if user paused or something? No, just fade.
             if (this.bgMusic) {
                 this.bgMusic.volume = Math.min(volumeStep * currentStep, this.targetVolume);
             }
@@ -225,8 +204,6 @@ class GameClient {
                 this.audioSystem.startClock();
             }
 
-            // Safe, Silent, Static
-            this.generator.updateIntroTick(delta);
             pFactor = 0.0;
 
             // Trigger: Walk Out (Z < 1.0)
@@ -234,15 +211,12 @@ class GameClient {
                 this.enterCorridor();
             }
 
-            // EASTER EGG: Out of Bounds Jumpscare (Z > 12) REMOVED - Moved to VOID logic
-
         } else if (this.currentZone === 'CORRIDOR') {
             // [ZONE: CORRIDOR]
             // Horror, Infinite, Audio
             pFactor = this.system.getParanoiaFactor();
             this.system.update(time, delta);
             this.system.updateClock(delta);
-            this.generator.update(this.player.controls.getObject().position.z, delta);
 
             // EASTER EGG: Back into the Nothingness (Z > 25)
             // If player exits intro, turns around, and walks into the void where intro was
@@ -264,19 +238,17 @@ class GameClient {
             (this.currentZone === 'INTRO') // Pass isIntro flag
         );
 
-        // Audio System Update
-        if (this.currentZone === 'INTRO') {
-            this.audioSystem.update(delta, this.player.metrics, 0);
-        } else {
-            this.audioSystem.update(delta, this.player.metrics, pFactor);
+        // --- GAME LOOP ---
+        // Global updates (Logic handled by Facade/System internally)
+        this.generator.update(this.player.controls.getObject().position.z, delta);
 
-            if (this.system.shouldTriggerWhisper) {
-                this.audioSystem.spawnWhisper(pFactor);
-                this.system.shouldTriggerWhisper = false;
-            }
+        // Single Audio Update
+        this.audioSystem.update(delta, this.player.metrics, pFactor);
+
+        if (this.currentZone === 'CORRIDOR' && this.system.shouldTriggerWhisper) {
+            this.audioSystem.spawnWhisper(pFactor);
+            this.system.shouldTriggerWhisper = false;
         }
-
-        this.system.updateClock(delta);
 
         if (this.currentZone === 'INTRO' && this.audioSystem.clockBuffer && !this.audioSystem.isClockPlaying) {
             // Ensure clock starts once loaded/unlocked
@@ -284,17 +256,6 @@ class GameClient {
                 this.audioSystem.startClock();
             }
         }
-
-        // --- GAME LOOP ---
-        this.generator.update(this.player.controls.getObject().position.z, delta);
-
-        this.generator.updateLights(delta);
-        this.audioSystem.update(delta, this.player.metrics, pFactor);
-
-        // Legacy atmosphere removed (handled in Player.js/FacilitySystem.js)
-
-        // Light instability (DELEGATED TO FACILITY SYSTEM)
-        // Removed to allow event-driven control
 
         /* ===============================
         RARE CLOCK DESYNC (every 10s)
@@ -310,11 +271,6 @@ class GameClient {
             this._clockDesyncTimer = 0;
             this.clock.elapsedTime -= 0.03;
         }
-
-        /* ===============================
-        CAMERA INVERSION (DELEGATED TO SYSTEM)
-        ================================ */
-        // Logic moved to FacilitySystem.handleRandomEvents
 
         this.renderer.render(this.scene, this.camera);
     }

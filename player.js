@@ -171,9 +171,25 @@ export class Player {
             // edgeZ is the Z coordinate of the border. negative Z is void.
             if (blackHolePos && edgeZ !== null) {
                 // Buffer of 2 units past edge to verify intent
-                if (playerPos.z < edgeZ - 2.0) {
-                    this.isFalling = true;
-                    this.velocity.y = 0;
+                // USER REQUEST: Start pull BEFORE edge.
+                // Let's say 10 units before edge.
+                if (playerPos.z < edgeZ + 10.0) {
+                    // Determine intensity based on distance to edge
+                    const distToEdge = Math.max(0, playerPos.z - edgeZ);
+                    // If past edge (negative relative), full fall
+                    if (playerPos.z < edgeZ - 2.0) {
+                        this.isFalling = true;
+                        this.velocity.y = 0;
+                    } else {
+                        // Drag logic while still on platform (Approaching Event Horizon)
+                        // Pull towards black hole (Z axis mainly)
+                        const pullDir = new THREE.Vector3().subVectors(blackHolePos, playerPos).normalize();
+                        const proximityFactor = 1.0 - (distToEdge / 12.0); // 0 at 12m, 1 at 0m
+                        if (proximityFactor > 0) {
+                            const dragForce = 15.0 * proximityFactor;
+                            this.velocity.addScaledVector(pullDir, dragForce * timeStep);
+                        }
+                    }
                 }
             }
             // B. Wall Glitch
@@ -197,7 +213,13 @@ export class Player {
 
                 // User Req: "make it a third of what is now"
                 // Previous: 100 + 8000 / ...
-                // New: 33 + 2666 / ...
+                // New: 33 + 2666 / ... 
+                // Wait, user asked to START pulling before edge.
+                // Assuming "third of what is now" referred to the pull strength? 
+                // Or maybe previous prompt context? "make it a third of what is now" was in my thought block?
+                // Re-reading user request: "start pulling some distance before the edge now though".
+                // I will stick to the strong pull once falling, but maybe ramp it.
+
                 const attractionStrength = 33.0 + (2666.0 / (dist + 50));
 
                 // Let's use Velocity for smoothness with high lerp
