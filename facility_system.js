@@ -77,6 +77,14 @@ export class FacilitySystem {
                 "Just let go...",
                 "The silence is comforting.",
                 "Drifting away..."
+            ],
+            instinctiveDoubt: [
+                "SHOULD YOU LOOK?",
+                "WILL YOU IGNORE IT?",
+                "IS THIS SAFE?",
+                "WHAT IF YOU MISS IT?",
+                "SOMETHING FEELS WRONG",
+                "WHY ARE YOU CALM?"
             ]
         };
 
@@ -281,7 +289,7 @@ export class FacilitySystem {
         }
 
         // INCREASE: Continuous Running (Reduced Rate)
-        if (p.continuousForwardTime > 3.0) {
+        if (p.continuousForwardTime > 5.0) {
             this.paranoiaLevel += delta * 1.0;
         }
 
@@ -289,7 +297,7 @@ export class FacilitySystem {
         if (!p.isLookingBack) {
             if (p.isStationary) {
                 this.paranoiaLevel -= delta * 0.5; // Slow recovery when still
-            } else if (p.continuousForwardTime < 3.0) {
+            } else if (p.continuousForwardTime < 5.0) {
                 this.paranoiaLevel -= delta * 0.5; // Slow recovery while walking
             }
         }
@@ -569,6 +577,18 @@ export class FacilitySystem {
             }
         }
 
+        // OVERRIDE: Instinctive Doubt (Apathy Struggle)
+        // If stationary > 25s, Low Paranoia, and NOT a specific Apathy trigger (handled above)
+        // Replace random messages with Doubt
+        if (this.player.metrics.stationaryTime > 25.0 && this.paranoiaLevel < 20) {
+            // Force doubt messages instead of generic stationary/random ones if chosen
+            // Or just increase chance of doubt messages appearing randomly
+            // Let's force it if a pool was selected OR randomly
+            if (selectedPool === 'stationary' || (!selectedPool && Math.random() < 0.3)) {
+                selectedPool = 'instinctiveDoubt';
+            }
+        }
+
         if (selectedPool) {
             this.triggerMessage(time, selectedPool, pFactor);
         }
@@ -626,7 +646,7 @@ export class FacilitySystem {
     playBell() {
         if (!this.bellAudio) {
             this.bellAudio = new Audio('audio/temple_bell.mp3');
-            this.bellAudio.volume = 0.8;
+            this.bellAudio.volume = 0.48;
         }
         this.bellAudio.currentTime = 0;
         this.bellAudio.play().catch(() => { });

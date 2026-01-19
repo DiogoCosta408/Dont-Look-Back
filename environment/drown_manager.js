@@ -19,6 +19,7 @@ export class DrownManager {
         this.timer = 0;
         this.waterMesh = null;
         this.isUnderwater = false;
+        this.resetTriggered = false;
     }
 
     createWater() {
@@ -305,14 +306,44 @@ export class DrownManager {
     }
 
     triggerReset() {
-        // Reload page to reset game (Hard Reset as requested for "Game Over")
-        location.reload();
+        if (this.resetTriggered) return;
+        this.resetTriggered = true;
+
+        console.log("SYS: Drown Ending - Fading to Black (10s)");
+
+        // Transition Layer (Use existing fade-overlay)
+        const overlay = document.getElementById('fade-overlay');
+        if (overlay) {
+            overlay.style.transition = "opacity 10s ease-in";
+            overlay.style.opacity = "1";
+            overlay.classList.add('active'); // Just in case class has props
+        }
+
+        // Wait 10s then Hard Reset
+        setTimeout(() => {
+            location.reload();
+        }, 10000);
+
+        // Fade Out Drown Music (if playing)
+        if (this.drownMusic && !this.drownMusic.paused) {
+            const fadeStep = this.drownMusic.volume / 80; // Fade over ~8s (80 * 100ms)
+            const fadeInterval = setInterval(() => {
+                if (this.drownMusic.volume > fadeStep) {
+                    this.drownMusic.volume -= fadeStep;
+                } else {
+                    this.drownMusic.volume = 0;
+                    this.drownMusic.pause();
+                    clearInterval(fadeInterval);
+                }
+            }, 100);
+        }
     }
 
     reset() {
         this.active = false;
         this.timer = 0;
         this.isUnderwater = false;
+        this.resetTriggered = false;
 
         // Clean up shake
         if (this.shakeActive && this.lastShakeOffset) {
