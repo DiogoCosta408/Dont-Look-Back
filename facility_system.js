@@ -37,9 +37,9 @@ export class FacilitySystem {
         this.messagePools = {
             stationary: [
                 "WHY HAVE YOU STOPPED?",
-                "CONTINUE MOVING",
+                "DON'T STOP",
                 "CAN YOU HEAR IT?",
-                "YOU ARE BEING WATCHED"
+                "YOU ARE STUCK"
             ],
             lookBack: [
                 "THERE IS NOTHING BEHIND YOU",
@@ -49,26 +49,25 @@ export class FacilitySystem {
                 "YOU SEEM NERVOUS"
             ],
             continuousMove: [
-                "KEEP WALKING",
-                "CONTINUE MOVING",
+                "KEEP GOING",
+                "CONTINUE",
                 "DO NOT STOP",
-                "YOU ARE MAKING PROGRESS",
-                "THE CORRIDOR CONTINUES"
+                "YOU WILL REACH THE END",
+                "THE CORRIDOR IS LONG"
             ],
             zoneReentry: [
                 "THIS PLACE REMEMBERS YOU",
                 "HAVE YOU BEEN HERE BEFORE?",
-                "YOU CANNOT GO BACK"
             ],
             highParanoia: [
-                "THEY KNOW YOU KNOW",
+                "THEY WON'T GET YOU",
                 "DONT TURN AROUND",
                 "IT IS GETTING CLOSER",
                 "RUN",
             ],
             contradiction: [
                 "IT WAS A LIE",
-                "THAT WAS FALSE",
+                "NO...",
             ],
             apathy: [
                 "It's peaceful here...",
@@ -82,8 +81,8 @@ export class FacilitySystem {
                 "SHOULD YOU LOOK?",
                 "WILL YOU IGNORE IT?",
                 "IS THIS SAFE?",
-                "WHAT IF YOU MISS IT?",
-                "SOMETHING FEELS WRONG",
+                "WHAT IF IT IS TRUE?",
+                "DON'T LET GO",
                 "WHY ARE YOU CALM?"
             ]
         };

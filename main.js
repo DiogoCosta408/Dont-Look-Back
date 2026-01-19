@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
 import { Player } from './player.js';
 import { FacilityGenerator } from './environment.js';
 import { FacilitySystem } from './facility_system.js';
@@ -38,10 +41,18 @@ class GameClient {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-        this.renderer.domElement.style.position = 'absolute';
-        this.renderer.domElement.style.top = '0';
         this.renderer.domElement.style.zIndex = '0';
         this.container.appendChild(this.renderer.domElement);
+
+        // [POST-PROCESSING]
+        this.composer = new EffectComposer(this.renderer);
+
+        const renderPass = new RenderPass(this.scene, this.camera);
+        this.composer.addPass(renderPass);
+
+        this.afterimagePass = new AfterimagePass();
+        this.afterimagePass.uniforms['damp'].value = 0.24; // Base Blur (Intermediate)
+        this.composer.addPass(this.afterimagePass);
 
         // [LIGHTING]
         const ambientLight = new THREE.AmbientLight(0x111111, 0.5); // Low ambient
@@ -152,6 +163,9 @@ class GameClient {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        if (this.composer) {
+            this.composer.setSize(window.innerWidth, window.innerHeight);
+        }
     }
 
     fadeInMusic() {
@@ -370,7 +384,39 @@ class GameClient {
             this.debugRotationLog--;
         }
 
-        this.renderer.render(this.scene, this.camera);
+        // [MOTION BLUR LOGIC]
+        if (this.afterimagePass) {
+            let targetDamp = 0.24 + (pFactor * 0.36); // Intermediate: 0.24 -> 0.60
+
+            // Random High Intensity Bursts (Trauma)
+            if (pFactor > 0.8) {
+                // If not currently bursting, tiny chance to start
+                if (!this.blurBurstActive) {
+                    if (Math.random() < 0.005) { // 0.5% chance per frame (~once every 3-4s @ 60fps)
+                        this.blurBurstActive = true;
+                        this.blurBurstTimer = 0;
+                        this.blurBurstDuration = 0.2 + Math.random() * 0.4; // 0.2s - 0.6s
+                    }
+                }
+            }
+
+            if (this.blurBurstActive) {
+                this.blurBurstTimer += delta;
+                targetDamp = 0.75; // Intermediate Spike (Was 0.92)
+                if (this.blurBurstTimer > this.blurBurstDuration) {
+                    this.blurBurstActive = false;
+                }
+            }
+
+            // Smooth Interpolation towards target (avoid instant accumulation snaps)
+            // But Afterimage is temporal, so changing 'damp' instantly is fine.
+            // Lerp for smoother feel?
+            const currentDamp = this.afterimagePass.uniforms['damp'].value;
+            this.afterimagePass.uniforms['damp'].value += (targetDamp - currentDamp) * delta * 5.0;
+        }
+
+        // this.renderer.render(this.scene, this.camera);
+        this.composer.render();
     }
 }
 
