@@ -39,7 +39,7 @@ export class FacilitySystem {
                 "WHY HAVE YOU STOPPED?",
                 "DON'T STOP",
                 "CAN YOU HEAR IT?",
-                "YOU ARE STUCK"
+                "ARE YOU LOST?"
             ],
             lookBack: [
                 "THERE IS NOTHING BEHIND YOU",
@@ -74,14 +74,12 @@ export class FacilitySystem {
                 "Why was I so afraid?",
                 "I don't want to move anymore.",
                 "Just let go...",
-                "The silence is comforting.",
                 "Drifting away..."
             ],
             instinctiveDoubt: [
                 "SHOULD YOU LOOK?",
                 "WILL YOU IGNORE IT?",
-                "IS THIS SAFE?",
-                "WHAT IF IT IS TRUE?",
+                "AM I SAFE?",
                 "DON'T LET GO",
                 "WHY ARE YOU CALM?"
             ]
