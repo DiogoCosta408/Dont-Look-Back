@@ -169,8 +169,8 @@ export class FacilitySystem {
                 // Start: 3.0s. End: 8.0s (User requested min 3s, max 8s)
                 const durationMs = (3000 + (progress * 5000));
 
-                // Set Cooldown: Duration + 10 seconds Silence
-                this.whisperCooldownTimer = (durationMs / 1000) + 10.0;
+                // Set Cooldown: Duration + 17 seconds Silence
+                this.whisperCooldownTimer = (durationMs / 1000) + 17.0;
 
                 // Start Fade Out 1s before end (min 0.1s delay to play something)
                 const fadeTime = 1000;

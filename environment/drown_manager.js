@@ -10,7 +10,7 @@ export class DrownManager {
         // Configuration
         this.waterYStart = -3.0;
         this.waterRiseSpeed = 0.8 * 0.15; // Halved again (0.3 -> 0.15)
-        this.wallDescendSpeed = 2.0 * 0.15; // Halved again (0.3 -> 0.15)
+        this.wallDescendSpeed = 2.0 * 0.15 * 0.85; // Slowed by 15%
         this.floorSinkSpeed = 0.5 * 0.15; // Halved again (0.3 -> 0.15)
         this.floorSinkDelay = 10.0;
 
@@ -52,8 +52,9 @@ export class DrownManager {
     }
 
     createSun() {
-        const tex = new THREE.TextureLoader().load('textures/2k_sun.jpg');
-        const geo = new THREE.SphereGeometry(100, 32, 32);
+        const tex = new THREE.TextureLoader().load('textures/pyramid.jpg');
+        // Pyramid: Radius 120, Height 250, 4 Radial Segments (Square base)
+        const geo = new THREE.ConeGeometry(120, 250, 4);
         const mat = new THREE.MeshBasicMaterial({
             map: tex,
             color: 0xffffff,
@@ -150,20 +151,20 @@ export class DrownManager {
         this.corridor.chunks.forEach(chunk => {
             chunk.children.forEach(child => {
                 if (child.name === "ceiling_left") {
-                    // Split Left (Disappear after 1s)
-                    if (this.timer < 1.0) {
-                        child.position.y += 0.66 * delta; // Up slow (1/3 speed)
-                        child.position.x -= 1.66 * delta; // Slide Left (1/3 speed)
-                        child.rotation.z += 0.033 * delta; // Tilt (1/3 speed)
+                    // Split Left (Disappear after 3s)
+                    if (this.timer < 3.0) {
+                        child.position.y += 0.264 * delta; // 0.66 * 0.4
+                        child.position.x -= 0.664 * delta; // 1.66 * 0.4
+                        child.rotation.z += 0.0132 * delta; // 0.033 * 0.4
                     } else {
                         child.visible = false;
                     }
                 } else if (child.name === "ceiling_right") {
-                    // Split Right (Disappear after 1s)
-                    if (this.timer < 1.0) {
-                        child.position.y += 0.66 * delta; // Up slow (1/3 speed)
-                        child.position.x += 1.66 * delta; // Slide Right (1/3 speed)
-                        child.rotation.z -= 0.033 * delta; // Tilt (1/3 speed)
+                    // Split Right (Disappear after 3s)
+                    if (this.timer < 3.0) {
+                        child.position.y += 0.264 * delta;
+                        child.position.x += 0.664 * delta;
+                        child.rotation.z -= 0.0132 * delta;
                     } else {
                         child.visible = false;
                     }
@@ -189,8 +190,8 @@ export class DrownManager {
                 this.lastShakeOffset = null;
             }
 
-            // Duration check (Extended to 25s per User Request)
-            if (this.timer < 25.0) {
+            // Duration check (Extended to 30s per User Request for slower columns)
+            if (this.timer < 30.0) {
                 const intensity = 0.02; // Softer Shake
                 const shakeX = (Math.random() - 0.5) * intensity;
                 const shakeY = (Math.random() - 0.5) * intensity;
