@@ -82,7 +82,7 @@ export class AudioSystem {
     }
 
     spawnWhisper(pFactor) {
-        // this.psych.spawnWhisper(pFactor);
+        this.psych.spawnWhisper(pFactor);
     }
 
     // --- COORDINATION ---

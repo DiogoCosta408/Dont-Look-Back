@@ -30,6 +30,7 @@ export class MovementController {
         this.acceleration = 30.0;
 
         this.isFalling = false;
+        this.enabled = true;
     }
 
     update(delta, isEndgame, blackHolePos, edgeZ, isIntro = false, pillarPositions = []) {
@@ -50,7 +51,7 @@ export class MovementController {
         this.velocity.x *= damping;
         this.velocity.z *= damping;
 
-        if (!this.isFalling) {
+        if (!this.isFalling && this.enabled) {
             this.direction.z = Number(this.moveForward) - Number(this.moveBackward);
             this.direction.x = Number(this.moveRight) - Number(this.moveLeft);
             this.direction.normalize();

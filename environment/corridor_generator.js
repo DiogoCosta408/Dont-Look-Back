@@ -75,6 +75,7 @@ export class CorridorGenerator {
         const floor = new THREE.Mesh(floorGeo, this.materials.floor);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
+        floor.name = "floor"; // ID for Drown Manager
         corridor.add(floor);
 
         // Ceiling
@@ -82,6 +83,7 @@ export class CorridorGenerator {
         ceiling.material = this.materials.ceiling;
         ceiling.position.y = height;
         ceiling.rotation.x = Math.PI / 2;
+        ceiling.name = "ceiling";
         corridor.add(ceiling);
 
         // Walls
@@ -89,10 +91,12 @@ export class CorridorGenerator {
         const leftWall = new THREE.Mesh(wallGeo, this.materials.wall);
         leftWall.position.set(-width / 2 - 0.5, height / 2, 0);
         leftWall.receiveShadow = true;
+        leftWall.name = "wall";
         corridor.add(leftWall);
 
         const rightWall = leftWall.clone();
         rightWall.position.set(width / 2 + 0.5, height / 2, 0);
+        rightWall.name = "wall";
         corridor.add(rightWall);
 
         // Pillars/Supports (Repetitive elements)
@@ -138,6 +142,7 @@ export class CorridorGenerator {
         const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
         leftPillar.position.set(-roomWidth / 2 + 0.5 + dX1, roomHeight / 2, zPos + dZ1);
         leftPillar.rotation.y = dRot1;
+        leftPillar.name = "pillar";
         parentGroup.add(leftPillar);
         this.interactables.push(leftPillar);
 
@@ -145,6 +150,7 @@ export class CorridorGenerator {
         const rightPillar = leftPillar.clone();
         rightPillar.position.set(roomWidth / 2 - 0.5 + dX2, roomHeight / 2, zPos + dZ2);
         rightPillar.rotation.y = dRot2;
+        rightPillar.name = "pillar";
         parentGroup.add(rightPillar);
         this.interactables.push(rightPillar);
 
@@ -165,6 +171,7 @@ export class CorridorGenerator {
         // Position Mesh
         const mesh = fixtureData.mesh;
         mesh.position.set(roomWidth / 2 - 1.3 + dX2, roomHeight - 2, lightZ);
+        mesh.name = "light_fixture"; // ID for Drown Manager
         parentGroup.add(mesh);
 
         // Create Light Source
@@ -173,6 +180,7 @@ export class CorridorGenerator {
 
         const pointLight = new THREE.PointLight(0xffaa00, intensity, 12);
         pointLight.position.set(roomWidth / 2 - 2 + dX2, roomHeight - 2, lightZ);
+        pointLight.name = "light_source"; // ID for Drown Manager
 
         // Register with Manager
         this.lightingManager.registerLight(pointLight, mesh);

@@ -72,6 +72,10 @@ class GameClient {
 
         // [PSYCHOLOGICAL AUDIO SYSTEM]
         this.audioSystem = new AudioSystem(this.camera);
+        this.system.audio = this.audioSystem;
+
+        // Inject Audio into Generator (for Drown Ending)
+        this.generator.setAudio(this.bgMusic);
 
         // [EVENTS]
         window.addEventListener('resize', this.onWindowResize.bind(this));

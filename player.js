@@ -34,6 +34,25 @@ export class Player {
     update(delta, interactables = [], pillarPositions = [], pFactor = 0, isEndgame = false, blackHolePos = null, edgeZ = null, isIntro = false) {
         if (!this.controls.isLocked) return;
 
+        // [VIEW LOCK Constraint]
+        if (this.viewLocked) {
+            // Restrict Yaw (Rotation Y) to narrow forward window or Lock entirely
+            // Corridor direction is -Z. Player should face -Z.
+            // Yaw of 0 is -Z. PI is +Z (Back).
+            // Let's Clamp rotation.y between -PI/2 and PI/2 (-90 to +90 deg)
+            // Object rotation is accumulated from mouse movement.
+
+            const obj = this.controls.getObject();
+            // Normalize angle
+            let y = obj.rotation.y;
+
+            // Clamp to Front 180 degrees (-PI/2 to PI/2)
+            if (y > Math.PI / 2) y = Math.PI / 2;
+            if (y < -Math.PI / 2) y = -Math.PI / 2;
+
+            obj.rotation.y = y;
+        }
+
         // 1. Movement & Physics
         this.movement.update(delta, isEndgame, blackHolePos, edgeZ, isIntro, pillarPositions);
 
@@ -80,5 +99,13 @@ export class Player {
 
     onKeyUp(event) {
         this.movement.onKeyUp(event.code);
+    }
+
+    setMobilized(state) {
+        this.movement.enabled = state;
+    }
+
+    setViewLocked(state) {
+        this.viewLocked = state;
     }
 }

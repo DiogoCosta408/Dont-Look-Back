@@ -130,21 +130,19 @@ export class EndgameManager {
     }
 
     createBlackHole() {
+        // Disabled Black Hole Geometry per user request
+        /*
         const geometry = new THREE.SphereGeometry(45, 64, 64);
-        const material = new THREE.MeshBasicMaterial({ color: 0x000000 });
-        this.blackHole = new THREE.Mesh(geometry, material);
+        ...
+        */
+
+        // Dummy wrapper for Glow/Sprite
+        this.blackHole = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ visible: false }));
+        this.blackHole.position.set(0, 0, 0);
         this.scene.add(this.blackHole);
 
-        // Glow
-        const glowTex = this.createGlowTexture();
-        const spriteMat = new THREE.SpriteMaterial({
-            map: glowTex, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false
-        });
-        this.halo = new THREE.Sprite(spriteMat);
-        this.halo.scale.set(120, 120, 1);
-        this.blackHole.add(this.halo);
+        // --- RESTORED SUN/STAR VISUALS ---
 
-        // Shader Star Glow
         const vertexShader = `
             varying vec3 vNormal;
             varying vec3 vWorldPosition;
@@ -171,17 +169,27 @@ export class EndgameManager {
             side: THREE.BackSide, blending: THREE.AdditiveBlending, transparent: true
         });
 
+        // Create Glow Mesh (The Big Star Halo)
+        // Was 48 radius, let's keep it or adjust if "Big Star" means the sprite
         const starGlow = new THREE.Mesh(new THREE.SphereGeometry(48, 64, 64), this.starGlowMat);
         starGlow.position.set(0, 0, -1);
         this.blackHole.add(starGlow);
 
-        // Sun Sprite
+        // Sun Sprite (The bright core)
+        // Need texture? The original code used 'glowTex' but it wasn't defined in the snippet I saw?
+        // Ah, createGlowTexture() is a method below.
+        const glowTex = this.createGlowTexture();
+
         const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({
             map: glowTex, color: 0xffaa00, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false
         }));
         sunSprite.scale.set(280, 280, 1);
         starGlow.add(sunSprite);
     }
+    // The closing brace below was misplaced in the original code, it should not be here.
+    // It seems to have been intended to close createBlackHole, but was after the commented out code.
+    // Removing it to fix the class structure.
+    // }
 
     createGlowTexture() {
         const canvas = document.createElement('canvas');

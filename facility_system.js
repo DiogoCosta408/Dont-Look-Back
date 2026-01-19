@@ -92,6 +92,25 @@ export class FacilitySystem {
 
         this.checkMessaging(time, pFactor);
         this.handleRandomEvents(time, delta, pFactor);
+
+        // DROWN ENDING CHECK
+        // If stationary for > 45s and Low Paranoia (< 20%)
+        if (this.player.metrics.stationaryTime > 45.0 && this.paranoiaLevel < 20) {
+            if (this.environment.enterDrownEnding) {
+                // Ensure single trigger
+                if (!this.environment.drownManager || !this.environment.drownManager.active) {
+                    this.environment.enterDrownEnding();
+
+                    // LOCK CONTROLS
+                    this.player.setMobilized(false);
+                    if (this.player.setViewLocked) this.player.setViewLocked(true); // No looking back
+                }
+            }
+        } else if (this.player.metrics.stationaryTime > 15.0 && this.player.metrics.stationaryTime < 45.0 && this.paranoiaLevel < 20) {
+            // WARNINGS (15s-45s)
+            // Random chance to whisper "Move..."
+            // DISABLED: User requested silence during this phase (or at least no violin plucking/random events)
+        }
     }
 
     getParanoiaFactor() {
@@ -99,6 +118,9 @@ export class FacilitySystem {
     }
 
     monitorParanoia(delta) {
+        // [BLOCK] If Drown Ending Active, Stop Paranoia Calculation
+        if (this.environment.drownManager && this.environment.drownManager.active) return;
+
         const p = this.player.metrics;
 
         // INCREASE: Looking Back (Doubled Rate per user request)
@@ -175,35 +197,14 @@ export class FacilitySystem {
     }
 
     checkStateChanges(pFactor) {
+        if (this.environment.drownManager && this.environment.drownManager.active) return;
         // Trigger Audio Whispers on State Change (Response, not random)
         // DISABLED PER USER REQUEST
-        /*
-        const p = this.player.metrics;
-        
-        let stateChanged = false;
-
-        // 1. Sudden Movement Stop/Start
-        if (this.lastState_stationary !== p.isStationary) {
-            this.lastState_stationary = p.isStationary;
-            stateChanged = true;
-        }
-
-        // 2. SUDDEN TWIST / TURN
-        if (Math.abs(p.rotationSpeed) > 5.0) { 
-            stateChanged = true;
-        }
-        
-        if (stateChanged && pFactor > 0.2) {
-            const chance = 0.6 + (pFactor * 0.4); 
-            if (Math.random() < chance) {
-                this.shouldTriggerWhisper = true; 
-            }
-        }
-        */
     }
 
     handleRandomEvents(time, delta, pFactor) {
         if (this.endgameTriggered) return; // NO EVENTS IN SPACE (Peace/Void)
+        if (this.environment.drownManager && this.environment.drownManager.active) return; // NO EVENTS DURING DROWNING
 
         if (pFactor < 0.1) return; // Too calm
 
@@ -326,6 +327,7 @@ export class FacilitySystem {
 
     checkMessaging(time, pFactor) {
         if (this.endgameTriggered) return; // No messages in space
+        if (this.environment.drownManager && this.environment.drownManager.active) return;
 
         // MESSAGING SYSTEM (4 Types)
         // 1. SYSTEM LOGS (Bottom Left, Green/Console style)
@@ -469,9 +471,14 @@ export class FacilitySystem {
         this.blackout.timer = 0;
         this.environment.forceBlackout = false;
 
+        if (this.environment.reset) this.environment.reset();
+
         this.cameraInversion.active = false;
         this.cameraInversion.timer = 0;
         this.player.camera.rotation.z = 0; // Fix rotation
+        if (this.player.setViewLocked) this.player.setViewLocked(false);
+
+        this.player.setMobilized(true);
 
         // Update UI
         this.updateStatus("STABLE", "status-ok");

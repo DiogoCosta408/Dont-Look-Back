@@ -5,6 +5,7 @@ import { CorridorGenerator } from './environment/corridor_generator.js';
 import { IntroRoom } from './environment/intro_room.js';
 import { EndgameManager } from './environment/endgame_manager.js';
 import { EffectsManager } from './environment/effects_manager.js';
+import { DrownManager } from './environment/drown_manager.js';
 
 export class FacilityGenerator {
     constructor(scene, camera) {
@@ -17,10 +18,13 @@ export class FacilityGenerator {
         this.intro = new IntroRoom(scene);
         this.endgame = new EndgameManager(scene, camera);
         this.effects = new EffectsManager(scene);
+        this.drownManager = new DrownManager(scene, camera, this.corridor, this.lighting);
 
         // State Flags
         this.stopGeneration = false;
         this.isEndgame = false;
+
+        this.bgMusic = null;
 
         // Initialize (Intro only)
         // Main.js calls startIntro -> createIntroRoom
@@ -34,6 +38,13 @@ export class FacilityGenerator {
         this.mirage = new IntroRoom(scene); // Secondary Intro Room
 
         console.log("ENV: Modular Generator Initialized.");
+    }
+
+    setAudio(bgMusic) {
+        this.bgMusic = bgMusic;
+        if (this.drownManager) {
+            this.drownManager.setAudio(bgMusic);
+        }
     }
 
     // --- PROXY PROPERTIES (Compatibility) ---
@@ -157,6 +168,18 @@ export class FacilityGenerator {
         this.mirage.destroy();
     }
 
+    enterDrownEnding() {
+        this.stopGeneration = true; // Prevent new chunks appearing from sky
+        this.drownManager.start();
+    }
+
+    reset() {
+        this.stopGeneration = false;
+        this.isEndgame = false;
+        this.drownManager.reset();
+        // Add other environment resets if needed
+    }
+
     // --- MAIN UPDATE LOOP ---
 
     update(playerZ, delta) {
@@ -171,6 +194,9 @@ export class FacilityGenerator {
 
         // 3. Effects (Mirage)
         // Explicitly called by system via updateMirageEffect
+
+        // 3B. Drown Ending
+        this.drownManager.update(delta);
 
         // 4. Endgame Logic
         if (this.stopGeneration || this.isEndgame) {
