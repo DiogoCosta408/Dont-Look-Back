@@ -64,6 +64,27 @@
             z-index: 9999;
         }
 
+        #death-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+            font-weight: bold;
+            color: #ffffff;
+            opacity: 0;
+            transition: opacity 1s ease-in;
+            z-index: 10000;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        #death-message.active {
+            opacity: 1;
+        }
+
         #fade-overlay.active {
             opacity: 1;
         }
@@ -120,6 +141,7 @@
     </div>
     <div id="underwater-overlay"></div>
     <div id="fade-overlay"></div>
+    <div id="death-message"></div>
 
     <div id="system-interface">
         <!-- UI DISABLED -->

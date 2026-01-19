@@ -135,8 +135,26 @@ export class MovementController {
 
                 if (dist < 48 && !this.fadedOut) { // Trigger just before hitting the 45 radius shell
                     this.fadedOut = true;
-                    console.log("PLAYER: CONSUMED BY VOID");
-                    window.dispatchEvent(new CustomEvent('reset-simulation'));
+                    console.log("PLAYER: CONSUMED BY VOID (10s Wait)");
+
+                    // Show "DON'T" after 2s
+                    setTimeout(() => {
+                        const msg = document.getElementById('death-message');
+                        if (msg) {
+                            msg.innerText = "DON'T";
+                            msg.classList.add('active');
+                        }
+                    }, 2000);
+
+                    // Delayed Reset
+                    setTimeout(() => {
+                        const msg = document.getElementById('death-message');
+                        if (msg) {
+                            msg.classList.remove('active');
+                            setTimeout(() => msg.innerText = "", 2000);
+                        }
+                        window.dispatchEvent(new CustomEvent('reset-simulation'));
+                    }, 10000);
                 }
             }
 

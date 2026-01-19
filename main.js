@@ -289,6 +289,14 @@ class GameClient {
                     this.debugRotationLog = 120;
 
                     console.log("MAIN: Entered Loop Room (Sanctuary)");
+
+                    // HIDDEN MESSAGE: "BACK"
+                    const msg = document.getElementById('death-message');
+                    if (msg) {
+                        msg.innerText = "BACK";
+                        msg.classList.add('active');
+                        setTimeout(() => msg.classList.remove('active'), 3000);
+                    }
                 }
 
                 // LEAVING (Teleport -> Seamless Shift)

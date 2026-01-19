@@ -35,8 +35,8 @@ export class DrownManager {
         const mat = new THREE.MeshBasicMaterial({
             color: 0x051022,
             map: waterTexture,
-            transparent: true,
-            opacity: 0.9,
+            transparent: false,
+            opacity: 1.0,
             side: THREE.DoubleSide
         });
 
@@ -318,6 +318,22 @@ export class DrownManager {
             overlay.style.opacity = "1";
             overlay.classList.add('active'); // Just in case class has props
         }
+
+        // HIDDEN MESSAGE: "LOOK"
+        setTimeout(() => {
+            const msg = document.getElementById('death-message');
+            if (msg) {
+                msg.innerText = "LOOK";
+                msg.classList.add('active');
+            }
+        }, 2000);
+
+        setTimeout(() => {
+            const msg = document.getElementById('death-message');
+            if (msg) {
+                msg.classList.remove('active');
+            }
+        }, 9000);
 
         // Wait 10s then Hard Reset
         setTimeout(() => {

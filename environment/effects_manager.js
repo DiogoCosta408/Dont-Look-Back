@@ -6,7 +6,7 @@ export class EffectsManager {
         this.mirageMesh = null;
         this.texLoader = new THREE.TextureLoader();
 
-        this.mirageTexture = this.texLoader.load('textures/mirage.png');
+        this.mirageTexture = this.texLoader.load('textures/mirage.jpg');
         this.createMirage();
     }
 
