@@ -25,7 +25,7 @@ class GameClient {
         // [SCENE SETUP]
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x000000); // PITCH BLACK
-        this.scene.fog = new THREE.FogExp2(0x000000, 0.02); // Restore Fog
+        this.scene.fog = new THREE.FogExp2(0x000000, 0.015); // Reduced Fog for visibility
 
         // [CAMERA SETUP]
         this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2000);
@@ -99,6 +99,11 @@ class GameClient {
 
         this.clock = new THREE.Clock();
         this.currentZone = 'INTRO'; // 'INTRO' | 'CORRIDOR'
+        this.insideMirage = false; // Initialize explicitly
+
+        // CRITICAL: Add Controls to Scene to ensure World Matrix updates correctly
+        this.scene.add(this.player.controls.getObject());
+
         this.startIntro();
         this.animate();
     }
@@ -134,32 +139,10 @@ class GameClient {
         }
 
         // 4. Initial Paranoia
-        this.system.paranoia = 0;
+        this.system.paranoiaLevel = 0;
     }
 
-    triggerJumpscare() {
-        if (this.jumpscareActive) return;
-        this.jumpscareActive = true;
-        console.log("MAIN: EASTER EGG TRIGGERED");
 
-        // 1. Audio
-        this.audioSystem.playSpook();
-
-        // 2. Visuals
-        const overlay = document.getElementById('jumpscare-overlay');
-        const img = document.getElementById('jumpscare-img');
-
-        if (overlay && img) {
-            overlay.style.display = 'flex';
-            void overlay.offsetWidth;
-            img.style.transform = 'scale(1.0)'; // Zoom In to face
-        }
-
-        // 3. Reset
-        setTimeout(() => {
-            window.location.reload();
-        }, 3000);
-    }
 
     onWindowResize() {
         this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -189,6 +172,11 @@ class GameClient {
     animate() {
         requestAnimationFrame(this.animate.bind(this));
 
+        // NUCLEAR FIX: Enforce Up Vector Every Frame
+        this.camera.up.set(0, 1, 0);
+
+
+
         const delta = this.clock.getDelta();
         const time = this.clock.getElapsedTime();
 
@@ -215,13 +203,112 @@ class GameClient {
             // [ZONE: CORRIDOR]
             // Horror, Infinite, Audio
             pFactor = this.system.getParanoiaFactor();
-            this.system.update(time, delta);
+
+            // FREEZE SYSTEM UPDATE if in Sanctuary (Mirage Room)
+            // This prevents Paranoia gain and Events while inside.
+            if (!this.insideMirage) {
+                this.system.update(time, delta);
+            } else {
+                // FORCE SANCTUARY STATE (Every Frame)
+                pFactor = 0.0;
+                this.system.cameraInversion.active = false;
+                this.player.cameraController.reset();
+            }
             this.system.updateClock(delta);
 
-            // EASTER EGG: Back into the Nothingness (Z > 25)
-            // If player exits intro, turns around, and walks into the void where intro was
-            if (this.player.controls.getObject().position.z > 25.0) {
-                this.triggerJumpscare();
+            // EASTER EGG: The Backrooms Loop (Darkness)
+            // If player wanders far into darkness, they find a loop.
+            const pZ = this.player.controls.getObject().position.z;
+
+            // 1. Spawn Mirage if getting close (Spawn at 70)
+            // Trigger early (Z > 5.0) so it's visible from far away
+            // 1. Spawn Mirage if getting close (Spawn at 100)
+            // Trigger early (Z > 5.0) so it's visible from far away
+            if (pZ > 5.0) {
+                if (!this.generator.mirage.roomGroup) {
+                    this.generator.createMirageRoom(100);
+                }
+            }
+
+            // 2. Loop Logic
+            if (this.generator.mirage.roomGroup) {
+                // Room at 100. Door at 100 + (-2) = 98.
+
+                // ENTERING (Pass Threshold)
+                if (pZ > 98.5 && !this.insideMirage) {
+                    this.insideMirage = true;
+
+                    // RESET STATE ON ENTRY (Sanctuary)
+
+                    // 1. Soft Reset (No full reset to avoid camera flips)
+                    this.system.paranoiaLevel = 0;
+                    this.system.cameraInversion.active = false;
+                    this.system.blackout.active = false;
+                    this.system.updateStatus("STABLE", "status-ok");
+
+                    // 2. Force Immediate Calm (for Player/Camera update this frame)
+                    pFactor = 0.0;
+
+                    // 3. Absolute Camera Correction
+                    this.system.cameraInversion.active = false;
+                    this.player.camera.rotation.z = 0;
+
+                    // We REMOVE the aggressive camera.up reset per user request/suspicion.
+                    // But we keep the controller reset to ensure no FOV surge lingers.
+                    this.player.cameraController.reset();
+
+                    console.log(`MAIN: SANCTUARY ENTRY - Soft Reset Applied.`);
+
+                    // Manual Audio Silence
+                    this.audioSystem.stopAll();
+                    if (this.bgMusic) this.bgMusic.pause();
+
+                    // Start Clocks
+                    this.generator.startMirageClock();
+                    if (this.audioSystem.startClock) this.audioSystem.startClock();
+
+                    // DEBUG: Trace rotation for next 120 frames
+                    this.debugRotationLog = 120;
+
+                    console.log("MAIN: Entered Loop Room (Sanctuary)");
+                }
+
+                // LEAVING (Teleport -> Seamless Shift)
+                if (this.insideMirage && pZ < 97.0) {
+                    console.log("MAIN: Loop Seamless Transition");
+
+                    // 1. Calculate Shift
+                    // New Center = 4. Old Center = 100. Delta = 4 - 100 = -96.
+                    const deltaZ = 4.0 - 100.0;
+
+                    this.player.controls.getObject().position.z += deltaZ;
+                    this.generator.mirage.roomGroup.position.z += deltaZ;
+
+                    // 2. Promote
+                    this.generator.promoteMirageToIntro();
+                    this.insideMirage = false;
+
+                    // 3. Reset System State
+                    this.system.reset();
+                    this.currentZone = 'INTRO';
+
+                    // 4. Generate World Behind Door
+                    this.generator.corridor.chunks.forEach(c => this.scene.remove(c));
+                    this.generator.corridor.chunks = [];
+                    this.generator.corridor.zOffset = 0;
+                    this.generator.corridor.interactables = [];
+
+                    this.generator.createInitialCorridor();
+
+                    // 5. Reset Audio System (Prepare for fade in)
+                    this.audioSystem.reset();
+                    if (this.bgMusic) {
+                        this.bgMusic.volume = 0;
+                        this.bgMusic.currentTime = 0;
+                        // Don't play yet, enterCorridor logic handles fade in when walking out?
+                        // Yes, player is now at approx Z=1, walking out < 1 triggers enterCorridor.
+                    }
+                }
             }
         }
 
@@ -270,6 +357,11 @@ class GameClient {
         if (this._clockDesyncTimer >= 10) {
             this._clockDesyncTimer = 0;
             this.clock.elapsedTime -= 0.03;
+        }
+
+        if (this.debugRotationLog > 0) {
+            console.log(`Frame ${this.debugRotationLog}: CamZ=${this.camera.rotation.z.toFixed(4)} ParZ=${this.player.controls.getObject().rotation.z.toFixed(4)} P_Met_Stat=${this.player.metrics.isStationary}`);
+            this.debugRotationLog--;
         }
 
         this.renderer.render(this.scene, this.camera);

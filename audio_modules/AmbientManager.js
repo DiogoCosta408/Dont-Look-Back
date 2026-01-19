@@ -109,4 +109,22 @@ export class AmbientManager {
             this.humGain = null;
         }
     }
+
+    // SILENCE EVERYTHING (For Intro Loop)
+    silence() {
+        // Cut Music
+        if (this.pressureFilter) {
+            this.pressureFilter.gain.setValueAtTime(0, this.ctx.currentTime);
+        }
+        // Cut Hum
+        this.stopHum();
+    }
+
+    reset() {
+        // Restore Music
+        if (this.pressureFilter) {
+            this.pressureFilter.gain.setValueAtTime(1.0, this.ctx.currentTime);
+            this.pressureFilter.frequency.value = 20000;
+        }
+    }
 }

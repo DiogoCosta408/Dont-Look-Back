@@ -205,4 +205,16 @@ export class PsychManager {
         }
         this.isFootstepsPlaying = false;
     }
+
+    silence() {
+        this.stopFootsteps();
+        this.heartbeatTimer = 999; // Delay next beat
+    }
+
+    reset() {
+        this.heartbeatTimer = 0;
+        this.whisperTimer = 10;
+        this.footstepsGraceTimer = 0;
+        this.footstepDurationTimer = 0;
+    }
 }

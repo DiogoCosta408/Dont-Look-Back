@@ -454,4 +454,38 @@ export class FacilitySystem {
             this.ui.neuro.className = className;
         }
     }
+
+    reset() {
+        console.log("SYS: System Reset (Loop)");
+        this.paranoiaLevel = 0;
+        this.maxParanoiaTimer = 0;
+        this.endgameTriggered = false;
+        this.lastMessageTime = 0;
+        this.recentMessages = [];
+        this.lastTriggeredBehavior = null;
+
+        // Reset Effects
+        this.blackout.active = false;
+        this.blackout.timer = 0;
+        this.environment.forceBlackout = false;
+
+        this.cameraInversion.active = false;
+        this.cameraInversion.timer = 0;
+        this.player.camera.rotation.z = 0; // Fix rotation
+
+        // Update UI
+        this.updateStatus("STABLE", "status-ok");
+        if (this.ui.log) this.ui.log.innerHTML = '';
+        if (this.ui.voice) this.ui.voice.innerHTML = '';
+
+        // Reset Player Metrics (Optional, but good for "New Game" feel)
+        // Accessing player directly might be tight coupling, but system owns analysis.
+        if (this.player && this.player.metrics) {
+            this.player.metrics.totalDistance = 0;
+            this.player.metrics.stationaryTime = 0;
+            this.player.metrics.continuousForwardTime = 0;
+            // Keep zone history? Maybe clear it so "revisiting" logic resets.
+            this.player.metrics.zoneHistory = [];
+        }
+    }
 }

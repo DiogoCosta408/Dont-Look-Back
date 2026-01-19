@@ -30,6 +30,9 @@ export class FacilityGenerator {
         // BUT we created drift/mirage?
         // Mirage is created in EffectsManager constructor.
 
+        // [DARKNESS LOOP]
+        this.mirage = new IntroRoom(scene); // Secondary Intro Room
+
         console.log("ENV: Modular Generator Initialized.");
     }
 
@@ -48,7 +51,8 @@ export class FacilityGenerator {
     get interactables() {
         return [
             ...this.corridor.interactables,
-            ...this.intro.interactables
+            ...this.intro.interactables,
+            ...this.mirage.interactables // Include Mirage interactables
         ];
     }
 
@@ -76,12 +80,45 @@ export class FacilityGenerator {
 
     createIntroRoom() {
         if (!this.intro.roomGroup) {
-            this.intro.create();
+            this.intro.create(new THREE.Vector3(0, 0, 4));
         }
     }
 
     destroyIntroRoom() {
         this.intro.destroy();
+    }
+
+    // [DARKNESS LOOP API]
+    createMirageRoom(z) {
+        if (!this.mirage.roomGroup) {
+            // Updated to pass false for autoStartClock, true for isMirage
+            this.mirage.create(new THREE.Vector3(0, 0, z), false, true);
+            console.log(`ENV: Created Mirage Room at Z=${z} (Clock Paused, Black Shell)`);
+        }
+    }
+
+    startMirageClock() {
+        if (this.mirage.roomGroup) {
+            this.mirage.startClock();
+        }
+    }
+
+    promoteMirageToIntro() {
+        if (this.mirage.roomGroup) {
+            // Destroy old intro
+            this.intro.destroy();
+
+            // Promote Mirage
+            this.intro = this.mirage;
+            console.log("ENV: Promoted Mirage to Intro Room");
+
+            // Reset Mirage slot
+            this.mirage = new IntroRoom(this.scene);
+        }
+    }
+
+    destroyMirageRoom() {
+        this.mirage.destroy();
     }
 
     setDriftIntensity(intensity) {
@@ -117,6 +154,7 @@ export class FacilityGenerator {
 
         // Cleanup Intro if still exists (usually gone by now but safe to ensure)
         this.intro.destroy();
+        this.mirage.destroy();
     }
 
     // --- MAIN UPDATE LOOP ---
@@ -129,6 +167,7 @@ export class FacilityGenerator {
 
         // 2. Intro Room (Mainly clock & flicker)
         this.intro.update(delta);
+        this.mirage.update(delta); // Update Mirage Room too
 
         // 3. Effects (Mirage)
         // Explicitly called by system via updateMirageEffect

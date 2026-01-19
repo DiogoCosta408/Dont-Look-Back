@@ -16,17 +16,32 @@ export class IntroRoom {
         this.introLightPanel = null;
     }
 
-    create() {
-        this.clockStartTime = Date.now();
+    create(positionOffset = new THREE.Vector3(0, 0, 4), autoStartClock = true, isMirage = false) {
+        this.clockRunning = autoStartClock;
+        if (this.clockRunning) {
+            this.clockStartTime = Date.now();
+        } else {
+            this.clockStartTime = 0; // Stopped
+        }
 
         const width = 4;
         const depth = 4;
         const height = 3;
 
         this.roomGroup = new THREE.Group();
-        this.roomGroup.position.set(0, 0, 4);
+        this.roomGroup.position.copy(positionOffset);
 
         const texLoader = new THREE.TextureLoader();
+
+        // (Rest of geometry creation omitted for brevity, logic continues below)
+        // ...
+
+        // Wait, replace_file_content replaces the WHOLE block targetted.
+        // I need to be careful not to delete the walls/floor code if I target a large chunk without providing it back.
+        // But the instruction says "Update create signature".
+        // Use a smaller chunk target for just the top of functions if possible, or provide full content for safety.
+        // Given I need to inject `this.clockRunning`... I will target the top of `create`.
+
 
         // Floor
         const floorTex = texLoader.load('textures/floor_tile.png');
@@ -111,7 +126,53 @@ export class IntroRoom {
 
         this.createLighting(texLoader, height);
 
+        // [OUTER SHELL]
+        // Disabled to debug "Ceiling/Floor" confusion
+        /*
+        if (isMirage) {
+            this.createOuterShell(width, height, depth);
+        }
+        */
+
         this.scene.add(this.roomGroup);
+    }
+
+    createOuterShell(width, height, depth) {
+        const shellMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Pitch black
+
+        // Make it slightly larger to prevent z-fighting
+        const eps = 0.05;
+
+        // Back
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(width + eps, height + eps), shellMat);
+        back.position.set(0, height / 2, depth / 2 + 0.01);
+        // Normal points +Z, which is OUTWARD from back wall
+        this.roomGroup.add(back);
+
+        // Left (Normal -X)
+        const left = new THREE.Mesh(new THREE.PlaneGeometry(depth + eps, height + eps), shellMat);
+        left.position.set(-width / 2 - 0.01, height / 2, 0);
+        left.rotation.y = -Math.PI / 2;
+        this.roomGroup.add(left);
+
+        // Right (Normal +X)
+        const right = new THREE.Mesh(new THREE.PlaneGeometry(depth + eps, height + eps), shellMat);
+        right.position.set(width / 2 + 0.01, height / 2, 0);
+        right.rotation.y = Math.PI / 2;
+        this.roomGroup.add(right);
+
+        // Top
+        const top = new THREE.Mesh(new THREE.PlaneGeometry(width + eps, depth + eps), shellMat);
+        top.position.set(0, height + 0.01, 0);
+        top.rotation.x = -Math.PI / 2;
+        this.roomGroup.add(top);
+
+        // Bottom not needed (under floor), but Front?
+        // Front has door, so maybe just blocking the wall parts.
+        // For simplicity, let's just do full black box on front too, but with hole?
+        // Or just let the front be open?
+        // User said "walls of this second room are all black seen from outside"
+        // Primarily side/back/top. Front is where you enter.
     }
 
     createFurnishings(texLoader, frameTex, frameMat) {
@@ -238,21 +299,35 @@ export class IntroRoom {
         this.roomGroup.add(carpet);
 
         // --- LAMP (Right of Table) ---
-        // Simplified geometry for brevity in refactor, but kept key parts
         const lBlack = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
 
         const lampGroup = new THREE.Group();
         lampGroup.position.set(-1.6, 0.0, -1.4);
 
+        // 1. Stem
         const lStem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.4), lBlack);
         lStem.position.y = 0.7;
         lampGroup.add(lStem);
 
+        // 2. Shade (Re-elevated, connected by bar)
+        // Previous Floating height: 1.65
         const lShade = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.12, 0.25, 32, 1, true), lBlack);
-        lShade.position.set(0.3, 1.65, 0);
+        lShade.position.set(0.3, 1.65, 0); // Back to offset
         lShade.rotation.z = Math.PI / 10;
         lShade.material.side = THREE.DoubleSide;
         lampGroup.add(lShade);
+
+        // 3. Diagonal Bar Connector
+        // Connects Top of Stem (0, 1.4, 0) to Shade Center (0.3, 1.65, 0)
+        // dx = 0.3, dy = 0.25.
+        // Length = sqrt(0.3^2 + 0.25^2) = 0.39
+        // Midpoint = (0.15, 1.525, 0)
+        // Angle = atan2(0.3, 0.25) -> Rotation Z.
+        // Actually, just visual approximation:
+        const connector = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4), lBlack);
+        connector.position.set(0.15, 1.52, 0);
+        connector.rotation.z = -0.85; // Roughly connects them
+        lampGroup.add(connector);
 
         // Spot
         const lSpot = new THREE.SpotLight(0xffaa00, 5.0, 5.0, Math.PI / 4, 0.5, 1);
@@ -311,6 +386,12 @@ export class IntroRoom {
         this.updateClockTime();
     }
 
+    startClock() {
+        this.clockRunning = true;
+        this.clockStartTime = Date.now();
+        this.updateClockTime();
+    }
+
     updateClockTime() {
         if (!this.clockCtx) return;
         const ctx = this.clockCtx;
@@ -318,14 +399,18 @@ export class IntroRoom {
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, 256, 128); // Background
 
-        const now = Date.now();
-        const start = this.clockStartTime;
-        const elapsed = now - start;
+        let timeStr = "00:00";
 
-        const totalSeconds = Math.floor(elapsed / 1000);
-        const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-        const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-        const timeStr = `${minutes}:${seconds}`;
+        if (this.clockRunning) {
+            const now = Date.now();
+            const start = this.clockStartTime;
+            const elapsed = now - start;
+
+            const totalSeconds = Math.floor(elapsed / 1000);
+            const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+            timeStr = `${minutes}:${seconds}`;
+        }
 
         ctx.fillStyle = '#ff0000'; // Red LED
         ctx.font = 'bold 80px monospace';

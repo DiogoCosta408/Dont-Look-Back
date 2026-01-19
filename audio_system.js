@@ -60,6 +60,18 @@ export class AudioSystem {
     startClock() { this.introAudio.startClock(); }
     stopClock() { this.introAudio.stopClock(); }
 
+    stopAll() {
+        // Silence Everything except Intro (Clock)
+        if (this.ambient.silence) this.ambient.silence();
+        if (this.psych.silence) this.psych.silence();
+        if (this.eventAudio.silence) this.eventAudio.silence();
+    }
+
+    reset() {
+        if (this.ambient.reset) this.ambient.reset();
+        if (this.psych.reset) this.psych.reset();
+    }
+
     // Properties accessed by Main
     get isClockPlaying() { return this.introAudio.isClockPlaying; }
     get clockBuffer() { return this.introAudio.clockBuffer; }
