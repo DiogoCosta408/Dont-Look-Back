@@ -24,7 +24,7 @@ export class EndgameManager {
 
     createDistantSun() {
         const geometry = new THREE.SphereGeometry(20, 32, 32);
-        const material = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+        const material = new THREE.MeshBasicMaterial({ color: 0xffffff }); // Fully White
         const sun = new THREE.Mesh(geometry, material);
         this.scene.add(sun);
         this.distantSun = sun;
@@ -130,16 +130,23 @@ export class EndgameManager {
     }
 
     createBlackHole() {
-        // Disabled Black Hole Geometry per user request
-        /*
         const geometry = new THREE.SphereGeometry(45, 64, 64);
-        ...
-        */
-
-        // Dummy wrapper for Glow/Sprite
-        this.blackHole = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({ visible: false }));
+        const material = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        this.blackHole = new THREE.Mesh(geometry, material);
         this.blackHole.position.set(0, 0, 0);
         this.scene.add(this.blackHole);
+
+        // Halo/Accretion Disk attached to black hole
+        const diskGeo = new THREE.RingGeometry(48, 60, 64);
+        const diskMat = new THREE.MeshBasicMaterial({
+            color: 0xffaa00,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.1
+        });
+        const disk = new THREE.Mesh(diskGeo, diskMat);
+        // disk.rotation.x = Math.PI / 2; // Keep it flat or facing? Facing camera
+        this.blackHole.add(disk);
 
         // --- RESTORED SUN/STAR VISUALS ---
 

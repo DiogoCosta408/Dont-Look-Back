@@ -78,13 +78,24 @@ export class CorridorGenerator {
         floor.name = "floor"; // ID for Drown Manager
         corridor.add(floor);
 
-        // Ceiling
-        const ceiling = floor.clone();
-        ceiling.material = this.materials.ceiling;
-        ceiling.position.y = height;
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.name = "ceiling";
-        corridor.add(ceiling);
+        // Ceiling (Split for Drown Ending Effect)
+        const ceilingGeo = new THREE.PlaneGeometry(width / 2, length);
+
+        // Left Ceiling
+        const ceilingL = new THREE.Mesh(ceilingGeo, this.materials.ceiling);
+        ceilingL.position.set(-width / 4, height, 0); // Offset left
+        ceilingL.rotation.x = Math.PI / 2;
+        ceilingL.receiveShadow = true;
+        ceilingL.name = "ceiling_left";
+        corridor.add(ceilingL);
+
+        // Right Ceiling
+        const ceilingR = new THREE.Mesh(ceilingGeo, this.materials.ceiling);
+        ceilingR.position.set(width / 4, height, 0); // Offset right
+        ceilingR.rotation.x = Math.PI / 2;
+        ceilingR.receiveShadow = true;
+        ceilingR.name = "ceiling_right";
+        corridor.add(ceilingR);
 
         // Walls
         const wallGeo = new THREE.BoxGeometry(1, height, length);

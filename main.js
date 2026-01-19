@@ -334,7 +334,9 @@ class GameClient {
         this.generator.update(this.player.controls.getObject().position.z, delta);
 
         // Single Audio Update
-        this.audioSystem.update(delta, this.player.metrics, pFactor);
+        if (!this.generator.drownManager || !this.generator.drownManager.active) {
+            this.audioSystem.update(delta, this.player.metrics, pFactor);
+        }
 
         if (this.currentZone === 'CORRIDOR' && this.system.shouldTriggerWhisper) {
             this.audioSystem.spawnWhisper(pFactor);

@@ -24,7 +24,7 @@ export class DrownManager {
     createWater() {
         // ... (unchanged)
         const textureLoader = new THREE.TextureLoader();
-        const waterTexture = textureLoader.load('textures/water.png');
+        const waterTexture = textureLoader.load('textures/water.jpg');
         waterTexture.wrapS = THREE.RepeatWrapping;
         waterTexture.wrapT = THREE.RepeatWrapping;
         waterTexture.repeat.set(20, 20);
@@ -51,15 +51,32 @@ export class DrownManager {
         this.bgMusic = bgMusic;
     }
 
+    createSun() {
+        const tex = new THREE.TextureLoader().load('textures/2k_sun.jpg');
+        const geo = new THREE.SphereGeometry(100, 32, 32);
+        const mat = new THREE.MeshBasicMaterial({
+            map: tex,
+            color: 0xffffff,
+            fog: false // Bright star, not affected by fog
+        });
+        this.sunMesh = new THREE.Mesh(geo, mat);
+
+        this.scene.add(this.sunMesh);
+        this.sunMesh.visible = false;
+    }
+
     start() {
         if (this.active) return;
         this.active = true;
         this.timer = 0;
         this.isUnderwater = false;
+        this.shakeActive = true;
+        this.lastShakeOffset = null;
 
         this.handleMusicStart();
 
         if (!this.waterMesh) this.createWater();
+        if (!this.sunMesh) this.createSun();
 
         // Position water
         this.waterMesh.position.x = this.camera.position.x;
@@ -67,14 +84,14 @@ export class DrownManager {
         this.waterMesh.position.y = this.waterYStart;
         this.waterMesh.visible = true;
 
-        // Hide Ceilings Immediately
-        this.corridor.chunks.forEach(chunk => {
-            chunk.children.forEach(child => {
-                if (child.name === "ceiling") {
-                    child.visible = false;
-                }
-            });
-        });
+        // Position Sun (High up, far away)
+        this.sunMesh.position.x = this.camera.position.x;
+        this.sunMesh.position.z = this.camera.position.z - 500; // Far ahead
+        this.sunMesh.position.y = 200; // High in sky
+        this.sunMesh.visible = true;
+
+        // No longer hiding immediately. Handled in Update for animation.
+
 
         // Adjust Fog to "Tight Fog" requested by user
         if (this.scene.fog) {
@@ -101,9 +118,9 @@ export class DrownManager {
             }, 100);
         }
 
-        // 2. Start Miserere
+        // 2. Start Kyrie
         if (!this.drownMusic) {
-            this.drownMusic = new Audio('audio/Miserere mei, Deus - Allegri - Tenebrae conducted by Nigel Short.mp3');
+            this.drownMusic = new Audio('audio/Kyrie Eleyson- Ukrainian Orthodox Chant of the XV Century by Kyiv Chamber Choir.mp3');
             this.drownMusic.loop = false;
         }
 
@@ -132,7 +149,25 @@ export class DrownManager {
         // Access chunks via corridor generator
         this.corridor.chunks.forEach(chunk => {
             chunk.children.forEach(child => {
-                if (child.name === "wall" || child.name === "pillar" || child.name === "light_fixture" || child.name === "light_source") {
+                if (child.name === "ceiling_left") {
+                    // Split Left (Disappear after 1s)
+                    if (this.timer < 1.0) {
+                        child.position.y += 0.66 * delta; // Up slow (1/3 speed)
+                        child.position.x -= 1.66 * delta; // Slide Left (1/3 speed)
+                        child.rotation.z += 0.033 * delta; // Tilt (1/3 speed)
+                    } else {
+                        child.visible = false;
+                    }
+                } else if (child.name === "ceiling_right") {
+                    // Split Right (Disappear after 1s)
+                    if (this.timer < 1.0) {
+                        child.position.y += 0.66 * delta; // Up slow (1/3 speed)
+                        child.position.x += 1.66 * delta; // Slide Right (1/3 speed)
+                        child.rotation.z -= 0.033 * delta; // Tilt (1/3 speed)
+                    } else {
+                        child.visible = false;
+                    }
+                } else if (child.name === "wall" || child.name === "pillar" || child.name === "light_fixture" || child.name === "light_source") {
                     child.position.y -= this.wallDescendSpeed * delta;
                 }
                 // Floor Sinking (Delayed)
@@ -143,6 +178,30 @@ export class DrownManager {
                 }
             });
         });
+
+
+
+        // 3. Screen Shake (Crumbling Columns)
+        if (this.shakeActive) {
+            // Remove previous frame's offset first to reset base position
+            if (this.lastShakeOffset) {
+                this.camera.position.sub(this.lastShakeOffset);
+                this.lastShakeOffset = null;
+            }
+
+            // Duration check (Extended to 25s per User Request)
+            if (this.timer < 25.0) {
+                const intensity = 0.02; // Softer Shake
+                const shakeX = (Math.random() - 0.5) * intensity;
+                const shakeY = (Math.random() - 0.5) * intensity;
+                const shakeZ = (Math.random() - 0.5) * intensity;
+
+                this.lastShakeOffset = new THREE.Vector3(shakeX, shakeY, shakeZ);
+                this.camera.position.add(this.lastShakeOffset);
+            } else {
+                this.shakeActive = false; // Stop shaking
+            }
+        }
 
         // 4. Underwater Check
         const camY = this.camera.position.y;
@@ -187,9 +246,21 @@ export class DrownManager {
         this.active = false;
         this.timer = 0;
         this.isUnderwater = false;
+
+        // Clean up shake
+        if (this.shakeActive && this.lastShakeOffset) {
+            this.camera.position.sub(this.lastShakeOffset);
+        }
+        this.shakeActive = false;
+        this.lastShakeOffset = null;
+
         if (this.waterMesh) {
             this.waterMesh.visible = false;
             this.waterMesh.position.y = this.waterYStart;
+        }
+
+        if (this.sunMesh) {
+            this.sunMesh.visible = false;
         }
 
         // Restore Fog

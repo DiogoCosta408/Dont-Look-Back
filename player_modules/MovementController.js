@@ -79,14 +79,16 @@ export class MovementController {
         // --- 3. AUTO-FALL CHECK ---
         if (isEndgame && !this.isFalling) {
             if (blackHolePos && edgeZ !== null) {
-                if (playerPos.z < edgeZ + 10.0) {
+                // INCREASED RANGE: Double the pull distance (User Request)
+                if (playerPos.z < edgeZ + 20.0) {
                     const distToEdge = Math.max(0, playerPos.z - edgeZ);
                     if (playerPos.z < edgeZ - 2.0) {
                         this.isFalling = true;
                         this.velocity.y = 0;
                     } else {
                         const pullDir = new THREE.Vector3().subVectors(blackHolePos, playerPos).normalize();
-                        const proximityFactor = 1.0 - (distToEdge / 12.0);
+                        // Scale proximity: 0 at 24 units away, 1 at edge
+                        const proximityFactor = 1.0 - (distToEdge / 24.0);
                         if (proximityFactor > 0) {
                             const dragForce = 15.0 * proximityFactor;
                             this.velocity.addScaledVector(pullDir, dragForce * timeStep);

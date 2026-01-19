@@ -92,6 +92,7 @@ export class FacilitySystem {
 
         this.checkMessaging(time, pFactor);
         this.handleRandomEvents(time, delta, pFactor);
+        this.updateBreathing(delta);
 
         // DROWN ENDING CHECK
         // If stationary for > 45s and Low Paranoia (< 20%)
@@ -101,20 +102,151 @@ export class FacilitySystem {
                 if (!this.environment.drownManager || !this.environment.drownManager.active) {
                     this.environment.enterDrownEnding();
 
+                    // Silence other audio (Violet, Footsteps, Ambience)
+                    if (this.audio && this.audio.stopAll) {
+                        this.audio.stopAll();
+                    }
+
+                    // Stop any active whisper IMMEDIATELY
+                    if (this._currentWhisper) {
+                        this._currentWhisper.pause();
+                        if (this._currentWhisper._fadeInterval) clearInterval(this._currentWhisper._fadeInterval);
+                        this._currentWhisper = null;
+                    }
+
                     // LOCK CONTROLS
                     this.player.setMobilized(false);
                     if (this.player.setViewLocked) this.player.setViewLocked(true); // No looking back
                 }
             }
-        } else if (this.player.metrics.stationaryTime > 15.0 && this.player.metrics.stationaryTime < 45.0 && this.paranoiaLevel < 20) {
-            // WARNINGS (15s-45s)
-            // Random chance to whisper "Move..."
-            // DISABLED: User requested silence during this phase (or at least no violin plucking/random events)
+        } else if (this.player.metrics.stationaryTime > 10.0 && this.player.metrics.stationaryTime < 45.0 && !(this.environment.drownManager && this.environment.drownManager.active)) {
+            // STOP WHISPERS IMMEDIATELY IF TURNING AROUND
+            if (this.player.metrics.isLookingBack) {
+                if (this._currentWhisper) {
+                    this._currentWhisper.pause();
+                    if (this._currentWhisper._fadeInterval) clearInterval(this._currentWhisper._fadeInterval);
+                    this._currentWhisper = null;
+                }
+                return; // Do not trigger new ones
+            }
+
+            // WARNINGS (10s-45s)
+            // Cooldown Check
+            if (this.whisperCooldownTimer === undefined) this.whisperCooldownTimer = 0;
+            this.whisperCooldownTimer -= delta;
+
+            if (this.whisperCooldownTimer > 0) return; // Wait for cooldown
+
+            // Calculate Intensity & Length (0.0 at 10s -> 1.0 at 45s)
+            const t = this.player.metrics.stationaryTime;
+            const progress = (t - 10.0) / (45.0 - 10.0); // 0.0 to 1.0
+
+            // Base chance increases with time
+            const baseChance = 0.002;
+            const chance = baseChance + (progress * 0.02);
+
+            // Random chance to play Whisper.mp3
+            if (Math.random() < chance) {
+                // Stop previous if any
+                if (this._currentWhisper) {
+                    this._currentWhisper.pause();
+                    if (this._currentWhisper._fadeInterval) clearInterval(this._currentWhisper._fadeInterval);
+                }
+
+                const hint = new Audio('audio/Whisper.mp3');
+                // Volume increases with intensity
+                hint.volume = 0.3 + (progress * 0.7);
+
+                // RANDOM SEEK for variety (start from somewhere in the middle?)
+                // actually full clip is better, just cut it off.
+                // maybe random start time to make shorts sound different?
+                // 'Whisper.mp3' might be short though. Let's assume start 0.
+
+                hint.play().catch(() => { });
+                this._currentWhisper = hint;
+
+                // VARIABLE DURATION (Short bursts -> Long)
+                // Start: 3.0s. End: 8.0s (User requested min 3s, max 8s)
+                const durationMs = (3000 + (progress * 5000));
+
+                // Set Cooldown: Duration + 10 seconds Silence
+                this.whisperCooldownTimer = (durationMs / 1000) + 10.0;
+
+                // Start Fade Out 1s before end (min 0.1s delay to play something)
+                const fadeTime = 1000;
+                const playTime = Math.max(100, durationMs - fadeTime);
+
+                setTimeout(() => {
+                    // Only fade if still active
+                    if (this._currentWhisper === hint) {
+                        const startVol = hint.volume;
+                        const fadeInterval = setInterval(() => {
+                            if (hint.volume > 0.02) {
+                                hint.volume -= 0.02;
+                            } else {
+                                hint.volume = 0;
+                                hint.pause();
+                                clearInterval(fadeInterval);
+                                if (this._currentWhisper === hint) this._currentWhisper = null;
+                            }
+                        }, 50); // Fade over ~1s-2s dep on volume
+                        hint._fadeInterval = fadeInterval;
+                    }
+                }, playTime);
+
+                // Clear ref when naturally done
+                hint.onended = () => {
+                    if (this._currentWhisper === hint) this._currentWhisper = null;
+                };
+            }
         }
     }
 
     getParanoiaFactor() {
         return this.paranoiaLevel / this.maxParanoia;
+    }
+
+    updateBreathing(delta) {
+        // Drown Ending Block
+        if (this.environment.drownManager && this.environment.drownManager.active) {
+            if (this.breathingAudio) {
+                this.breathingAudio.pause();
+                this.breathingAudio.currentTime = 0;
+            }
+            return;
+        }
+
+        // Logic: Low Paranoia (< 20) AND Stationary (> 2s)
+        const isCalm = this.paranoiaLevel < 20;
+        const isStationary = this.player.metrics.stationaryTime > 2.0;
+
+        if (isCalm && isStationary) {
+            if (!this.breathingAudio) {
+                this.breathingAudio = new Audio('audio/Slow Breathing.mp3');
+                this.breathingAudio.loop = true;
+                this.breathingAudio.volume = 0;
+            }
+
+            // Play if not playing
+            if (this.breathingAudio.paused) {
+                this.breathingAudio.play().catch(() => { });
+            }
+
+            // Fade In to 0.3
+            if (this.breathingAudio.volume < 0.3) {
+                this.breathingAudio.volume = Math.min(0.3, this.breathingAudio.volume + delta * 0.1);
+            }
+        } else {
+            // Fade Out and Stop
+            if (this.breathingAudio && !this.breathingAudio.paused) {
+                if (this.breathingAudio.volume > 0.01) {
+                    this.breathingAudio.volume = Math.max(0, this.breathingAudio.volume - delta * 0.5);
+                } else {
+                    this.breathingAudio.pause();
+                    this.breathingAudio.currentTime = 0;
+                }
+            }
+        }
     }
 
     monitorParanoia(delta) {
@@ -470,6 +602,19 @@ export class FacilitySystem {
         this.blackout.active = false;
         this.blackout.timer = 0;
         this.environment.forceBlackout = false;
+
+        if (this._currentWhisper) {
+            this._currentWhisper.pause();
+            if (this._currentWhisper._fadeInterval) clearInterval(this._currentWhisper._fadeInterval);
+            this._currentWhisper = null;
+        }
+
+        if (this.breathingAudio) {
+            this.breathingAudio.pause();
+            this.breathingAudio.currentTime = 0;
+        }
+
+        this.whisperCooldownTimer = 0;
 
         if (this.environment.reset) this.environment.reset();
 
