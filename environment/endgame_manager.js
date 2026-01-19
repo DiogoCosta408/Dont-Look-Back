@@ -183,8 +183,6 @@ export class EndgameManager {
         this.blackHole.add(starGlow);
 
         // Sun Sprite (The bright core)
-        // Need texture? The original code used 'glowTex' but it wasn't defined in the snippet I saw?
-        // Ah, createGlowTexture() is a method below.
         const glowTex = this.createGlowTexture();
 
         const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({

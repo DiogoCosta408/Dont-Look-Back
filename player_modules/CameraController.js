@@ -7,12 +7,14 @@ export class CameraController {
         this.swayTime = 0;
 
         this.fovSurge = { active: false, timer: 0 };
+        this.externalShake = 0;
     }
 
     reset() {
         this.swayTime = 0;
         this.fovSurge.active = false;
         this.fovSurge.timer = 0;
+        this.externalShake = 0;
 
         // Force Camera Reset
         this.camera.rotation.z = 0;
@@ -57,10 +59,27 @@ export class CameraController {
         const swayAmount = pFactor * 0.05;
         const sway = Math.sin(this.swayTime * 0.8) * swayAmount;
 
-        // Only apply if there's actual paranoia/sway (Allows free cam otherwise)
-        if (pFactor > 0.01 && Math.abs(this.camera.rotation.z) < 0.2) {
-            this.camera.rotation.z = sway;
+        // Base Sway
+        let totalRotZ = sway;
+
+        // 3. EXTERNAL SHAKE (Look Back / Trauma)
+        if (this.externalShake > 0) {
+            const s = this.externalShake;
+            // Random jitter
+            totalRotZ += (Math.random() - 0.5) * s * 0.5;
+            // Also apply slight XY offset for violent shake?
+            this.camera.position.x += (Math.random() - 0.5) * s * 0.05;
+            this.camera.position.y += (Math.random() - 0.5) * s * 0.05;
         }
+
+        // Only apply if there's actual paranoia/sway (Allows free cam otherwise)
+        if ((pFactor > 0.01 || this.externalShake > 0) && Math.abs(this.camera.rotation.z) < 0.5) {
+            this.camera.rotation.z = totalRotZ;
+        }
+    }
+
+    setShake(intensity) {
+        this.externalShake = intensity;
     }
 
     // Moved Bobbing Logic here as well? 

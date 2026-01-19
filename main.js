@@ -402,7 +402,7 @@ class GameClient {
 
             if (this.blurBurstActive) {
                 this.blurBurstTimer += delta;
-                targetDamp = 0.75; // Intermediate Spike (Was 0.92)
+                targetDamp = 0.94; // Extreme Spike (User Req: Much Higher)
                 if (this.blurBurstTimer > this.blurBurstDuration) {
                     this.blurBurstActive = false;
                 }

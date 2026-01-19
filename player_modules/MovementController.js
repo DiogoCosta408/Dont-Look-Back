@@ -81,18 +81,19 @@ export class MovementController {
             if (blackHolePos && edgeZ !== null) {
                 // INCREASED RANGE: Triple the pull distance (User Request: 24 -> 72)
                 if (playerPos.z < edgeZ + 72.0) {
-                    const distToEdge = Math.max(0, playerPos.z - edgeZ);
+                    // EVENT HORIZON: Constant Pull (No escape)
                     if (playerPos.z < edgeZ - 2.0) {
                         this.isFalling = true;
                         this.velocity.y = 0;
                     } else {
                         const pullDir = new THREE.Vector3().subVectors(blackHolePos, playerPos).normalize();
-                        // Scale proximity: 0 at 72 units away, 1 at edge
-                        const proximityFactor = 1.0 - (distToEdge / 72.0);
-                        if (proximityFactor > 0) {
-                            const dragForce = 15.0 * proximityFactor;
-                            this.velocity.addScaledVector(pullDir, dragForce * timeStep);
-                        }
+
+                        // Constant Force (User Req: "Constant speed", "Cannot run from it")
+                        // Friction is 5.0. Need force > 20 to overpower walking (accel 30).
+                        // Let's set a dominant constant pull.
+                        const constantPull = 25.0;
+
+                        this.velocity.addScaledVector(pullDir, constantPull * timeStep);
                     }
                 }
             }
@@ -116,7 +117,23 @@ export class MovementController {
                 this.velocity.lerp(pullDir.multiplyScalar(attractionStrength), timeStep * 3.3);
                 playerPos.addScaledVector(this.velocity, timeStep);
 
-                if (dist < 10 && !this.fadedOut) {
+                // [BLACK HOLE TRANSITION]
+                // Radius is 45. Start fade at 100. Solid black at 50.
+                const fadeStart = 100;
+                const fadeEnd = 50;
+
+                if (dist < fadeStart) {
+                    const overlay = document.getElementById('fade-overlay');
+                    if (overlay) {
+                        // Map dist [100 -> 50] to opacity [0 -> 1]
+                        let opacity = 1.0 - ((dist - fadeEnd) / (fadeStart - fadeEnd));
+                        opacity = Math.max(0, Math.min(1, opacity));
+                        overlay.style.opacity = opacity;
+                        overlay.style.transition = 'none'; // Instant update based on distance
+                    }
+                }
+
+                if (dist < 48 && !this.fadedOut) { // Trigger just before hitting the 45 radius shell
                     this.fadedOut = true;
                     console.log("PLAYER: CONSUMED BY VOID");
                     window.dispatchEvent(new CustomEvent('reset-simulation'));

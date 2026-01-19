@@ -93,6 +93,7 @@ export class FacilitySystem {
         this.apathyLevel = 0;
         this.lastStationaryReset = 0;
         this.bellFlags = { level2: false, level3: false, finalWarning: false };
+        this.lookBackTimer = 0;
     }
 
     update(time, delta) {
@@ -114,9 +115,24 @@ export class FacilitySystem {
         this.handleRandomEvents(time, delta, pFactor);
         this.updateBreathing(delta);
 
+        // [APATHY TRACKER]
+        // Strict requirement: Continuous stationary + Low Paranoia (< 20)
+        if (this.apathyTimer === undefined) this.apathyTimer = 0;
+
+        if (this.player.metrics.stationaryTime > 0.1 && this.paranoiaLevel < 20.0) {
+            this.apathyTimer += delta;
+        } else {
+            // Reset if moved OR paranoia spiked
+            this.apathyTimer = 0;
+            this.apathyLevel = 0;
+            this.bellFlags.level2 = false;
+            this.bellFlags.level3 = false;
+            this.bellFlags.finalWarning = false;
+        }
+
         // DROWN ENDING CHECK
-        // If stationary for > 60s and Low Paranoia (< 20%)
-        if (this.player.metrics.stationaryTime > 60.0 && this.paranoiaLevel < 20) {
+        // If strict apathy time > 60s
+        if (this.apathyTimer > 60.0) {
             if (this.environment.enterDrownEnding) {
                 // Ensure single trigger
                 if (!this.environment.drownManager || !this.environment.drownManager.active) {
@@ -142,21 +158,19 @@ export class FacilitySystem {
                     if (this.player.setViewLocked) this.player.setViewLocked(true); // No looking back
                 }
             }
-        } else if (this.player.metrics.stationaryTime > 10.0 && this.player.metrics.stationaryTime < 60.0 && !(this.environment.drownManager && this.environment.drownManager.active)) {
+        } else if (this.apathyTimer > 10.0 && !(this.environment.drownManager && this.environment.drownManager.active)) {
             // STOP WHISPERS IMMEDIATELY IF TURNING AROUND
+            // (Handled by paranoia spike resetting timer, but good to be safe)
             if (this.player.metrics.isLookingBack) {
-                if (this._currentWhisper) {
-                    this._currentWhisper.pause();
-                    if (this._currentWhisper._fadeInterval) clearInterval(this._currentWhisper._fadeInterval);
-                    this._currentWhisper = null;
-                }
-                return; // Do not trigger new ones
+                // Actually looking back spikes paranoia, which resets apathyTimer to 0. 
+                // So we won't be in this block.
+                return;
             }
 
             // WARNINGS (10s-60s)
 
-            // BELL WARNING (59s - 1s before Drown)
-            if (this.player.metrics.stationaryTime > 59.0 && this.paranoiaLevel < 20 && !this.bellFlags.finalWarning) {
+            // BELL WARNING (59s)
+            if (this.apathyTimer > 59.0 && !this.bellFlags.finalWarning) {
                 this.playBell();
                 this.bellFlags.finalWarning = true;
             }
@@ -168,7 +182,7 @@ export class FacilitySystem {
             if (this.whisperCooldownTimer > 0) return; // Wait for cooldown
 
             // Calculate Intensity & Length (0.0 at 10s -> 1.0 at 60s)
-            const t = this.player.metrics.stationaryTime;
+            const t = this.apathyTimer;
             const progress = (t - 10.0) / (60.0 - 10.0); // 0.0 to 1.0
 
             // Base chance increases with time
@@ -285,17 +299,41 @@ export class FacilitySystem {
 
         const p = this.player.metrics;
 
-        // INCREASE: Looking Back (Doubled Rate per user request)
-        if (p.isLookingBack) {
-            this.paranoiaLevel += delta * 20.0;
+        // [LOOK BACK MECHANIC]
+
+        // Instant Spike (Positive -> Negative Z Crossing)
+        if (p.turnAroundTrigger) {
+            this.paranoiaLevel += 15.0; // User Request: +15
+            console.log("SYS: Look Back Return Spike (+15)");
         }
 
-        // INCREASE: Continuous Running (Reduced Rate)
+        // Continuous Gain (While Z > 0)
+        if (p.isLookingBack) {
+            this.paranoiaLevel += delta * 3.0; // User Request: +3/sec
+
+            // Timer for Shake
+            if (this.lookBackTimer === undefined) this.lookBackTimer = 0;
+            this.lookBackTimer += delta;
+
+            // Progressive Screen Shake
+            // Start > 1s. Max at 10s.
+            if (this.lookBackTimer > 1.0) {
+                const progress = Math.min(1.0, (this.lookBackTimer - 1.0) / 9.0);
+                const shakeIntensity = progress * 0.5;
+                if (this.player.cameraController) this.player.cameraController.setShake(shakeIntensity);
+            }
+        } else {
+            this.lookBackTimer = 0;
+            if (this.player.cameraController) this.player.cameraController.setShake(0);
+        }
+
+        // [CONTINUOUS RUNNING]
         if (p.continuousForwardTime > 5.0) {
             this.paranoiaLevel += delta * 1.0;
         }
 
-        // DECAY: Recover when stationary or moving carefully
+        // [DECAY - RECOVERY]
+        // Only recover if NOT Looking Back AND (Stationary OR Careful Walking)
         if (!p.isLookingBack) {
             if (p.isStationary) {
                 this.paranoiaLevel -= delta * 0.5; // Slow recovery when still
@@ -610,9 +648,8 @@ export class FacilitySystem {
         }
 
         // OVERRIDE: Instinctive Doubt (Apathy Struggle)
-        // If stationary > 25s, Low Paranoia, and NOT a specific Apathy trigger (handled above)
-        // Replace random messages with Doubt
-        if (this.player.metrics.stationaryTime > 25.0 && this.paranoiaLevel < 20) {
+        // If stationary > 25s (Strict Apathy Timer)
+        if (this.apathyTimer > 25.0) {
             // Force doubt messages instead of generic stationary/random ones if chosen
             // Or just increase chance of doubt messages appearing randomly
             // Let's force it if a pool was selected OR randomly

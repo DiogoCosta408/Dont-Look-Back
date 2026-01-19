@@ -25,6 +25,8 @@ export class MetricsManager {
         this.raycaster = new THREE.Raycaster();
         this.center = new THREE.Vector2(0, 0);
         this._lastZoneCheck = 0;
+        this._vecForward = new THREE.Vector3();
+        this._lastForwardZ = -1;
     }
 
     update(delta, currentPos, interactables, blackHolePos, inputs) {
@@ -93,12 +95,42 @@ export class MetricsManager {
         this.metrics.lastYaw = currentYaw;
 
         // Detect rapid turns (Look back)
+        // Detect rapid turns (Look back)
+        // [CORRECTION] User pointed out this was measuring SPEED, not DIRECTION.
+        // We now check actual camera orientation.
+        // Assuming "Forward" is -Z (walking deeper), "Back" is +Z.
+
+        // Detect Look Back (Directional)
+        // Logic: Corridor Axis (Z).
+        // Positive (Back) -> Negative (Forward) = Spike Trigger (+15)
+        // Negative -> Positive = No Spike
+
+        try {
+            this.camera.getWorldDirection(this._vecForward);
+            const z = this._vecForward.z;
+
+            // Continuous State: Looking Back if Z > 0 (Positive)
+            this.metrics.isLookingBack = z > 0;
+
+            // Spike Trigger: Positive -> Negative
+            if (this._lastForwardZ > 0 && z <= 0) {
+                this.metrics.turnAroundTrigger = true;
+            } else {
+                this.metrics.turnAroundTrigger = false;
+            }
+
+            this._lastForwardZ = z;
+
+        } catch (e) {
+            this.metrics.isLookingBack = false;
+            this.metrics.turnAroundTrigger = false;
+        }
+
+        // Keep rotation speed metric for other uses
         if (this.metrics.rotationSpeed > 3.0) {
             this.metrics.lookBackCount += delta;
-            this.metrics.isLookingBack = true;
         } else {
             this.metrics.lookBackCount = Math.max(0, this.metrics.lookBackCount - delta);
-            this.metrics.isLookingBack = false;
         }
 
         // 2. Continuous Forward Movement
