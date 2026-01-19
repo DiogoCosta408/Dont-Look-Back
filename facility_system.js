@@ -123,6 +123,9 @@ export class FacilitySystem {
                 if (!this.environment.drownManager || !this.environment.drownManager.active) {
                     this.environment.enterDrownEnding();
 
+                    // Fade out Bell if it's ringing (Final Warning)
+                    this.fadeOutBell();
+
                     // Silence other audio (Violet, Footsteps, Ambience)
                     if (this.audio && this.audio.stopAll) {
                         this.audio.stopAll();
@@ -519,18 +522,48 @@ export class FacilitySystem {
                     this.playBell();
                     this.bellFlags.level2 = true;
                 }
+                // Return to avoid random messages immediately after
+                // But only if we JUST triggered it? 
+                // Actually, if we are in this block, we are > 30s. 
+                // We don't want to prevent ALL messages forever after 30s.
+                // We only want to return if we JUST triggered the event (apathyLevel changed or bellPlayed).
+                // But apathyLevel stays at 2 until 45s.
+                // So if we return here, we block ALL random messages between 30s and 45s?
+                // YES, that would be bad. The user wants "random yellow messages... between bells".
+
+                // Correction: Only return if we actually TRIGGERED the message this frame.
+                // But logMessage sends it.
+                // Logic:
+                // if (trigger condition) { do message; return; }
+
+                // Let's refactor the trigger slightly to return ONLY when firing.
             }
 
-            // Level 3: 45s (Bell + Message)
-            if (this.player.metrics.stationaryTime > 45.0) {
-                if (this.apathyLevel < 3) {
-                    this.apathyLevel = 3;
-                    this.logMessage(apathyPool[3], 0, style); // "Just let go..."
-                }
-                if (!this.bellFlags.level3) {
-                    this.playBell();
-                    this.bellFlags.level3 = true;
-                }
+            // Refactored Block for correct return behavior:
+
+            // Level 2 Trigger
+            if (this.player.metrics.stationaryTime > 30.0 && this.apathyLevel < 2) {
+                this.apathyLevel = 2;
+                this.logMessage(apathyPool[2], 0, style);
+                if (!this.bellFlags.level2) { this.playBell(); this.bellFlags.level2 = true; }
+                return;
+            }
+            // Catch-up for bell if missed (unlikely but safe)
+            if (this.player.metrics.stationaryTime > 30.0 && !this.bellFlags.level2) {
+                this.playBell();
+                this.bellFlags.level2 = true;
+            }
+
+            // Level 3 Trigger
+            if (this.player.metrics.stationaryTime > 45.0 && this.apathyLevel < 3) {
+                this.apathyLevel = 3;
+                this.logMessage(apathyPool[3], 0, style);
+                if (!this.bellFlags.level3) { this.playBell(); this.bellFlags.level3 = true; }
+                return;
+            }
+            if (this.player.metrics.stationaryTime > 45.0 && !this.bellFlags.level3) {
+                this.playBell();
+                this.bellFlags.level3 = true;
             }
         }
 
@@ -650,6 +683,20 @@ export class FacilitySystem {
         }
         this.bellAudio.currentTime = 0;
         this.bellAudio.play().catch(() => { });
+    }
+
+    fadeOutBell() {
+        if (this.bellAudio && !this.bellAudio.paused) {
+            const fadeInterval = setInterval(() => {
+                if (this.bellAudio.volume > 0.02) {
+                    this.bellAudio.volume -= 0.02;
+                } else {
+                    this.bellAudio.volume = 0;
+                    this.bellAudio.pause();
+                    clearInterval(fadeInterval);
+                }
+            }, 50); // Fade over ~1s
+        }
     }
 
     logMessage(text, pFactor = 0, styleOverride = null) {
