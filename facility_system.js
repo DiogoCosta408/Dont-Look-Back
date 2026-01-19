@@ -536,66 +536,56 @@ export class FacilitySystem {
         }
 
         // APATHY MODE MESSAGING (Stationary & Low Paranoia < 20)
+        let processedApathyEvent = false;
+
         if (this.player.metrics.stationaryTime > 5.0 && this.paranoiaLevel < 20) {
             const apathyPool = this.messagePools.apathy;
             const style = { color: '#cccccc', textShadow: '0 0 5px #ffffff' }; // Light Gray effect
 
-            // Level 1: ~15s
+            // Helper to trigger delayed message
+            const triggerApathySequence = (level, msgIndex) => {
+                this.apathyLevel = level;
+
+                // 1. Play Bell
+                this.playBell();
+
+                // 2. Delayed Message (0.5s)
+                setTimeout(() => {
+                    this.logMessage(apathyPool[msgIndex], 0, style);
+                }, 500);
+
+                // Block regular messages for a while (full duration of effect ~5-8s)
+                this.lastApathyEventTime = time;
+                processedApathyEvent = true;
+            };
+
+            // Level 1: ~15s (Just message, no bell usually? Or bell? User said "Bell & Message Timing")
+            // Previously Level 1 (15s) was just message. Level 2 (30s) was Bell+Message.
+            // Let's keep Level 1 as just message for Intro, but apply the "lockout" logic.
             if (this.player.metrics.stationaryTime > 15.0 && this.apathyLevel < 1) {
                 this.apathyLevel = 1;
-                this.logMessage(apathyPool[0], 0, style); // "It's peaceful here..."
-                return;
+                this.logMessage(apathyPool[0], 0, style);
+                this.lastApathyEventTime = time;
+                processedApathyEvent = true;
             }
 
             // Level 2: 30s (Bell + Message)
-            if (this.player.metrics.stationaryTime > 30.0) {
-                if (this.apathyLevel < 2) {
-                    this.apathyLevel = 2;
-                    this.logMessage(apathyPool[2], 0, style); // "I don't want to move anymore."
-                }
-                if (!this.bellFlags.level2) {
-                    this.playBell();
-                    this.bellFlags.level2 = true;
-                }
-                // Return to avoid random messages immediately after
-                // But only if we JUST triggered it? 
-                // Actually, if we are in this block, we are > 30s. 
-                // We don't want to prevent ALL messages forever after 30s.
-                // We only want to return if we JUST triggered the event (apathyLevel changed or bellPlayed).
-                // But apathyLevel stays at 2 until 45s.
-                // So if we return here, we block ALL random messages between 30s and 45s?
-                // YES, that would be bad. The user wants "random yellow messages... between bells".
-
-                // Correction: Only return if we actually TRIGGERED the message this frame.
-                // But logMessage sends it.
-                // Logic:
-                // if (trigger condition) { do message; return; }
-
-                // Let's refactor the trigger slightly to return ONLY when firing.
-            }
-
-            // Refactored Block for correct return behavior:
-
-            // Level 2 Trigger
             if (this.player.metrics.stationaryTime > 30.0 && this.apathyLevel < 2) {
-                this.apathyLevel = 2;
-                this.logMessage(apathyPool[2], 0, style);
-                if (!this.bellFlags.level2) { this.playBell(); this.bellFlags.level2 = true; }
-                return;
+                triggerApathySequence(2, 2);
+                if (!this.bellFlags.level2) this.bellFlags.level2 = true;
             }
-            // Catch-up for bell if missed (unlikely but safe)
+            // Catch-up Bell
             if (this.player.metrics.stationaryTime > 30.0 && !this.bellFlags.level2) {
                 this.playBell();
                 this.bellFlags.level2 = true;
             }
 
-            // Level 3 Trigger
+            // Level 3: 45s (Bell + Message)
             if (this.player.metrics.stationaryTime > 45.0 && this.apathyLevel < 3) {
-                this.apathyLevel = 3;
-                this.logMessage(apathyPool[3], 0, style);
-                if (!this.bellFlags.level3) { this.playBell(); this.bellFlags.level3 = true; }
-                return;
+                triggerApathySequence(3, 3);
+                if (!this.bellFlags.level3) this.bellFlags.level3 = true;
             }
+            // Catch-up Bell
             if (this.player.metrics.stationaryTime > 45.0 && !this.bellFlags.level3) {
                 this.playBell();
                 this.bellFlags.level3 = true;
@@ -605,13 +595,36 @@ export class FacilitySystem {
         // MESSAGING SYSTEM (4 Types)
         // 1. SYSTEM LOGS (Bottom Left, Green/Console style)
         // 2. VOICES (Top Center, Ghostly)
-        // Cooldown: Minimum 8s, up to 15s
-        const currentCooldown = Math.max(8.0, this.baseMessageCooldown - (pFactor * 7.0));
+
+        // GATING: If Apathy Event just happened, block regular messages for 10 seconds
+        if (this.lastApathyEventTime && (time - this.lastApathyEventTime < 10.0)) return;
+
+        // APATHY MODE REGULAR INTERVALS
+        // If in Apathy Mode (Stationary + Low Paranoia), ensure "regular" intervals for yellow messages
+        let currentCooldown = Math.max(13.0, this.baseMessageCooldown - (pFactor * 7.0));
+
+        if (this.player.metrics.stationaryTime > 5.0 && this.paranoiaLevel < 20) {
+            // "Keep frequency but more regular"
+            // Use a semi-fixed interval (e.g., 12s) instead of random chance
+            currentCooldown = 13.0;
+        }
 
         if (time - this.lastMessageTime < currentCooldown) return;
 
         const p = this.player.metrics;
         let selectedPool = null;
+
+        // Force selection in Apathy Mode if cooldown met
+        if (this.player.metrics.stationaryTime > 5.0 && this.paranoiaLevel < 20) {
+            // Prioritize "Instinctive Doubt" or "Stationary"
+            // User: "regular yellow messages"
+            // Let's pick from stationary or instinctiveDoubt
+            if (Math.random() < 0.5) selectedPool = 'stationary';
+            else selectedPool = 'instinctiveDoubt';
+        } else {
+            // Normal Logic (Random Chance)
+            // ...
+        }
 
         // High Paranoia Overlay
         if (pFactor > 0.7 && Math.random() < 0.4) {
