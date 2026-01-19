@@ -151,23 +151,15 @@ export class DrownManager {
         this.corridor.chunks.forEach(chunk => {
             chunk.children.forEach(child => {
                 if (child.name === "ceiling_left") {
-                    // Split Left (Disappear after 3s)
-                    if (this.timer < 3.0) {
-                        child.position.y += 0.264 * delta; // 0.66 * 0.4
-                        child.position.x -= 0.664 * delta; // 1.66 * 0.4
-                        child.rotation.z += 0.0132 * delta; // 0.033 * 0.4
-                    } else {
-                        child.visible = false;
-                    }
+                    // Split Left (Persist indefinitely)
+                    child.position.y += 0.264 * delta; // 0.66 * 0.4
+                    child.position.x -= 0.664 * delta; // 1.66 * 0.4
+                    child.rotation.z += 0.0132 * delta; // 0.033 * 0.4
                 } else if (child.name === "ceiling_right") {
-                    // Split Right (Disappear after 3s)
-                    if (this.timer < 3.0) {
-                        child.position.y += 0.264 * delta;
-                        child.position.x += 0.664 * delta;
-                        child.rotation.z -= 0.0132 * delta;
-                    } else {
-                        child.visible = false;
-                    }
+                    // Split Right (Persist indefinitely)
+                    child.position.y += 0.264 * delta;
+                    child.position.x += 0.664 * delta;
+                    child.rotation.z -= 0.0132 * delta;
                 } else if (child.name === "wall" || child.name === "pillar" || child.name === "light_fixture" || child.name === "light_source") {
                     child.position.y -= this.wallDescendSpeed * delta;
                 }
@@ -212,7 +204,27 @@ export class DrownManager {
             this.enterUnderwater();
         }
 
-        if (this.isUnderwater) {
+        if (this.isUnderwater && this.points) {
+            // Animate Bubbles
+            // Since they are children of camera, Y+ is 'Up' relative to camera view.
+            // Player view is locked horizontal-ish, so Y+ is screen up.
+            const positions = this.points.geometry.attributes.position.array;
+            const speeds = this.points.geometry.attributes.speed.array;
+
+            for (let i = 0; i < positions.length / 3; i++) {
+                // Y is index + 1
+                positions[i * 3 + 1] += speeds[i] * delta; // Move Up
+
+                // Reset if too high (camera Y view space is approx -10 to +10)
+                if (positions[i * 3 + 1] > 10) {
+                    positions[i * 3 + 1] = -10;
+                    // Randomize X/Z again
+                    positions[i * 3] = (Math.random() - 0.5) * 20;
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * 20 - 5;
+                }
+            }
+            this.points.geometry.attributes.position.needsUpdate = true;
+
             // Darken fog rapidly until pitch black
             const densityRate = 0.5 * delta;
             this.scene.fog.density += densityRate;
@@ -229,13 +241,67 @@ export class DrownManager {
         }
     }
 
+    createBubbles() {
+        // Particles moving Up relative to Camera
+        const count = 200;
+        const geo = new THREE.BufferGeometry();
+        const pos = [];
+        const speeds = [];
+
+        for (let i = 0; i < count; i++) {
+            // Random box around camera
+            const x = (Math.random() - 0.5) * 20;
+            const y = (Math.random() - 0.5) * 20;
+            const z = (Math.random() - 0.5) * 20 - 5; // Mostly in front
+            pos.push(x, y, z);
+            speeds.push(1.0 + Math.random() * 2.0); // Upward speed
+        }
+
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.setAttribute('speed', new THREE.Float32BufferAttribute(speeds, 1));
+
+        // Simple Circle Texture via Canvas (No external file needed)
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        ctx.beginPath();
+        ctx.arc(16, 16, 14, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fill();
+        const tex = new THREE.CanvasTexture(canvas);
+
+        const mat = new THREE.PointsMaterial({
+            color: 0xaaccff,
+            size: 0.2,
+            map: tex,
+            transparent: true,
+            opacity: 0.6,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+
+        this.points = new THREE.Points(geo, mat);
+        this.camera.add(this.points); // Attach to camera so they travel with us (relative motion simulated)
+        // Actually, if we attach to camera, 'up' is relative to camera rotation.
+        // Better: Attach to scene, but keep respawning them near camera.
+        // Let's try camera attachment for simple effect first, but player is locked looking forward so it works.
+        this.points.visible = false;
+    }
+
     enterUnderwater() {
         this.isUnderwater = true;
         console.log("SYS: Player Submerged");
 
-        // Change fog to underwater color (Deep Foggy Blue)
-        this.scene.fog.color.setHex(0x000510); // Very deep blue, almost black but blue tinted
-        // Trigger sound effect via system if possible, or just visual focus here
+        // 1. Fog
+        this.scene.fog.color.setHex(0x000510);
+
+        // 2. HTML Overlay
+        const overlay = document.getElementById('underwater-overlay');
+        if (overlay) overlay.classList.add('active');
+
+        // 3. Bubbles
+        if (!this.points) this.createBubbles();
+        if (this.points) this.points.visible = true;
     }
 
     triggerReset() {

@@ -69,10 +69,23 @@ export class FacilitySystem {
             contradiction: [
                 "IT WAS A LIE",
                 "THAT WAS FALSE",
+            ],
+            apathy: [
+                "It's peaceful here...",
+                "Why was I so afraid?",
+                "I don't want to move anymore.",
+                "Just let go...",
+                "The silence is comforting.",
+                "Drifting away..."
             ]
         };
 
         this.recentMessages = []; // Anti-repetition queue
+
+        // Track Apathy Levels (0, 1, 2...)
+        this.apathyLevel = 0;
+        this.lastStationaryReset = 0;
+        this.bellFlags = { level2: false, level3: false, finalWarning: false };
     }
 
     update(time, delta) {
@@ -95,8 +108,8 @@ export class FacilitySystem {
         this.updateBreathing(delta);
 
         // DROWN ENDING CHECK
-        // If stationary for > 45s and Low Paranoia (< 20%)
-        if (this.player.metrics.stationaryTime > 45.0 && this.paranoiaLevel < 20) {
+        // If stationary for > 60s and Low Paranoia (< 20%)
+        if (this.player.metrics.stationaryTime > 60.0 && this.paranoiaLevel < 20) {
             if (this.environment.enterDrownEnding) {
                 // Ensure single trigger
                 if (!this.environment.drownManager || !this.environment.drownManager.active) {
@@ -119,7 +132,7 @@ export class FacilitySystem {
                     if (this.player.setViewLocked) this.player.setViewLocked(true); // No looking back
                 }
             }
-        } else if (this.player.metrics.stationaryTime > 10.0 && this.player.metrics.stationaryTime < 45.0 && !(this.environment.drownManager && this.environment.drownManager.active)) {
+        } else if (this.player.metrics.stationaryTime > 10.0 && this.player.metrics.stationaryTime < 60.0 && !(this.environment.drownManager && this.environment.drownManager.active)) {
             // STOP WHISPERS IMMEDIATELY IF TURNING AROUND
             if (this.player.metrics.isLookingBack) {
                 if (this._currentWhisper) {
@@ -130,16 +143,23 @@ export class FacilitySystem {
                 return; // Do not trigger new ones
             }
 
-            // WARNINGS (10s-45s)
+            // WARNINGS (10s-60s)
+
+            // BELL WARNING (59s - 1s before Drown)
+            if (this.player.metrics.stationaryTime > 59.0 && this.paranoiaLevel < 20 && !this.bellFlags.finalWarning) {
+                this.playBell();
+                this.bellFlags.finalWarning = true;
+            }
+
             // Cooldown Check
             if (this.whisperCooldownTimer === undefined) this.whisperCooldownTimer = 0;
             this.whisperCooldownTimer -= delta;
 
             if (this.whisperCooldownTimer > 0) return; // Wait for cooldown
 
-            // Calculate Intensity & Length (0.0 at 10s -> 1.0 at 45s)
+            // Calculate Intensity & Length (0.0 at 10s -> 1.0 at 60s)
             const t = this.player.metrics.stationaryTime;
-            const progress = (t - 10.0) / (45.0 - 10.0); // 0.0 to 1.0
+            const progress = (t - 10.0) / (60.0 - 10.0); // 0.0 to 1.0
 
             // Base chance increases with time
             const baseChance = 0.002;
@@ -461,6 +481,51 @@ export class FacilitySystem {
         if (this.endgameTriggered) return; // No messages in space
         if (this.environment.drownManager && this.environment.drownManager.active) return;
 
+        // RESET APATHY LEVEL IF MOVING
+        if (this.player.metrics.stationaryTime < 1.0) {
+            this.apathyLevel = 0;
+            this.bellFlags.level2 = false;
+            this.bellFlags.level3 = false;
+            this.bellFlags.finalWarning = false;
+        }
+
+        // APATHY MODE MESSAGING (Stationary & Low Paranoia < 20)
+        if (this.player.metrics.stationaryTime > 5.0 && this.paranoiaLevel < 20) {
+            const apathyPool = this.messagePools.apathy;
+            const style = { color: '#cccccc', textShadow: '0 0 5px #ffffff' }; // Light Gray effect
+
+            // Level 1: ~15s
+            if (this.player.metrics.stationaryTime > 15.0 && this.apathyLevel < 1) {
+                this.apathyLevel = 1;
+                this.logMessage(apathyPool[0], 0, style); // "It's peaceful here..."
+                return;
+            }
+
+            // Level 2: 30s (Bell + Message)
+            if (this.player.metrics.stationaryTime > 30.0) {
+                if (this.apathyLevel < 2) {
+                    this.apathyLevel = 2;
+                    this.logMessage(apathyPool[2], 0, style); // "I don't want to move anymore."
+                }
+                if (!this.bellFlags.level2) {
+                    this.playBell();
+                    this.bellFlags.level2 = true;
+                }
+            }
+
+            // Level 3: 45s (Bell + Message)
+            if (this.player.metrics.stationaryTime > 45.0) {
+                if (this.apathyLevel < 3) {
+                    this.apathyLevel = 3;
+                    this.logMessage(apathyPool[3], 0, style); // "Just let go..."
+                }
+                if (!this.bellFlags.level3) {
+                    this.playBell();
+                    this.bellFlags.level3 = true;
+                }
+            }
+        }
+
         // MESSAGING SYSTEM (4 Types)
         // 1. SYSTEM LOGS (Bottom Left, Green/Console style)
         // 2. VOICES (Top Center, Ghostly)
@@ -558,7 +623,16 @@ export class FacilitySystem {
         }
     }
 
-    logMessage(text, pFactor = 0) {
+    playBell() {
+        if (!this.bellAudio) {
+            this.bellAudio = new Audio('audio/temple_bell.mp3');
+            this.bellAudio.volume = 0.8;
+        }
+        this.bellAudio.currentTime = 0;
+        this.bellAudio.play().catch(() => { });
+    }
+
+    logMessage(text, pFactor = 0, styleOverride = null) {
         // Use Voice Overlay if available, else fallback
         const targetContainer = this.ui.voice || this.ui.log;
 
@@ -572,7 +646,13 @@ export class FacilitySystem {
         // Urgency styling
         entry.style.fontWeight = (pFactor > 0.5) ? 'bold' : '300';
 
-        if (pFactor > 0.8) {
+        if (styleOverride) {
+            // Apply custom styles
+            if (styleOverride.color) entry.style.color = styleOverride.color;
+            if (styleOverride.textShadow) entry.style.textShadow = styleOverride.textShadow;
+            if (styleOverride.fontSize) entry.style.fontSize = styleOverride.fontSize;
+            if (styleOverride.letterSpacing) entry.style.letterSpacing = styleOverride.letterSpacing;
+        } else if (pFactor > 0.8) {
             entry.style.color = '#ff0000'; // Pure Red
             entry.style.textShadow = '0 0 20px red';
             entry.style.fontSize = '32px'; // Larger than base 24px

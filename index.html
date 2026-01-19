@@ -68,6 +68,26 @@
             opacity: 1;
         }
 
+        #underwater-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #001a33;
+            /* Deep Blue */
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 2s ease-in-out;
+            z-index: 5000;
+            mix-blend-mode: multiply;
+            /* Better blending */
+        }
+
+        #underwater-overlay.active {
+            opacity: 0.8;
+        }
+
         /* HIDDEN UI ELEMENTS (Disabled per User Request) 
            Keeping definitions in CSS just in case, but hiding usage below.
         */
@@ -98,6 +118,7 @@
     <div id="crt-overlay" class="crt-overlay">
         <div class="scanline"></div>
     </div>
+    <div id="underwater-overlay"></div>
 
     <div id="system-interface">
         <!-- UI DISABLED -->
