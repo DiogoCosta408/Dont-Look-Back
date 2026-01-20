@@ -123,7 +123,7 @@ export class IntroRoom {
         this.roomGroup.add(headBeam);
 
         // ASSETS
-        this.createFurnishings(texLoader, dFrameTex, dFrameMat);
+        this.createFurnishings(texLoader, dFrameTex, dFrameMat, isMirage);
 
         this.createLighting(texLoader, height);
 
@@ -176,7 +176,7 @@ export class IntroRoom {
         // Primarily side/back/top. Front is where you enter.
     }
 
-    createFurnishings(texLoader, frameTex, frameMat) {
+    createFurnishings(texLoader, frameTex, frameMat, isMirage = false) {
         // Since frameEx was a typo in arg list just above, fixing:
         // Re-load if needed or use existing.
         // Actually I passed dFrameMat but also need dFrameTex reference maybe?
@@ -276,9 +276,10 @@ export class IntroRoom {
         this.interactables.push(frame);
 
         // Canvas
+        const portraitTex = isMirage ? 'textures/nottobereproduced.jpg' : 'textures/fractal.png';
         const portrait = new THREE.Mesh(
             new THREE.PlaneGeometry(1.5, 2.0),
-            new THREE.MeshBasicMaterial({ map: texLoader.load('textures/fractal.png'), color: 0x999999 })
+            new THREE.MeshBasicMaterial({ map: texLoader.load(portraitTex), color: 0x999999 })
         );
         portrait.position.set(2.0 - 0.06, 1.5, 0);
         portrait.rotation.y = -Math.PI / 2;
