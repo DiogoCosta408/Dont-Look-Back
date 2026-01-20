@@ -82,7 +82,6 @@ export class FacilitySystem {
                 "SHOULD YOU LOOK?",
                 "WILL YOU IGNORE IT?",
                 "IS THIS SAFE?",
-                "WHAT IF YOU MISS IT?",
                 "SOMETHING FEELS WRONG",
                 "WHY ARE YOU CALM?"
             ]
@@ -350,6 +349,28 @@ export class FacilitySystem {
 
                 this.endgameTriggered = true;
                 console.log("SYS: PSYCHOSIS BREAK - TRIGGERING ENDGAME");
+
+                // CRITICAL: Stop all audio during True Ending
+                if (this.audio) {
+                    if (this.audio.stopAll) this.audio.stopAll();
+                    if (this.audio.stopClock) this.audio.stopClock();
+                }
+                if (this.breathingAudio) {
+                    this.breathingAudio.pause();
+                    this.breathingAudio.currentTime = 0;
+                }
+                if (this.bellAudio) {
+                    this.bellAudio.pause();
+                    this.bellAudio.currentTime = 0;
+                }
+
+                // Stop any whispers
+                if (this._currentWhisper) {
+                    this._currentWhisper.pause();
+                    if (this._currentWhisper._fadeInterval) clearInterval(this._currentWhisper._fadeInterval);
+                    this._currentWhisper = null;
+                }
+
                 this.environment.enterEndgame();
             }
         } else {

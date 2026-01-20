@@ -334,7 +334,7 @@ class GameClient {
         this.generator.update(this.player.controls.getObject().position.z, delta);
 
         // Single Audio Update
-        if (!this.generator.drownManager || !this.generator.drownManager.active) {
+        if ((!this.generator.drownManager || !this.generator.drownManager.active) && !this.generator.isEndgame) {
             this.audioSystem.update(delta, this.player.metrics, pFactor);
         }
 

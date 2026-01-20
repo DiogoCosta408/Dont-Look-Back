@@ -102,7 +102,8 @@ export class MetricsManager {
         }
 
         // 2. Continuous Forward Movement
-        if (inputs.moveForward && !inputs.moveBackward && !inputs.moveLeft && !inputs.moveRight) {
+        // Allow strafing (Left/Right) provided Forward is held and Back is not.
+        if (inputs.moveForward && !inputs.moveBackward) {
             this.metrics.continuousForwardTime += delta;
         } else {
             this.metrics.continuousForwardTime = 0;
