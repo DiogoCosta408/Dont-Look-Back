@@ -44,7 +44,8 @@ export class IntroRoom {
 
 
         // Floor
-        const floorTex = texLoader.load('textures/floor_tile.png');
+        const floorTexName = isMirage ? 'textures/floor_tile2.png' : 'textures/floor_tile.png';
+        const floorTex = texLoader.load(floorTexName);
         floorTex.wrapS = THREE.RepeatWrapping;
         floorTex.wrapT = THREE.RepeatWrapping;
         floorTex.repeat.set(2, 2);

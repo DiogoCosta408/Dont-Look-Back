@@ -6,6 +6,7 @@ import { Player } from './player.js';
 import { FacilityGenerator } from './environment.js';
 import { FacilitySystem } from './facility_system.js';
 import { AudioSystem } from './audio_system.js';
+import { EndingTracker } from './system_modules/EndingTracker.js';
 
 console.log("FACILITY_OS: CORE SYSTEM INITIALIZED");
 
@@ -85,6 +86,9 @@ class GameClient {
         this.audioSystem = new AudioSystem(this.camera);
         this.system.audio = this.audioSystem;
 
+        // [ENDING TRACKER]
+        this.endingTracker = new EndingTracker();
+
         // Inject Audio into Generator (for Drown Ending)
         this.generator.setAudio(this.bgMusic);
 
@@ -94,9 +98,17 @@ class GameClient {
         document.addEventListener('keyup', (e) => this.player.onKeyUp(e));
 
         // RESET EVENT (Endgame Loop)
+        // RESET EVENT (Endgame Loop)
         window.addEventListener('reset-simulation', () => {
+            if (this.trueEndingActive) return; // Block resets if True Ending
             console.log("MAIN: Resetting Simulation...");
             window.location.reload();
+        });
+
+        // ENDING TRIGGER EVENT
+        window.addEventListener('ending-triggered', (e) => {
+            if (this.trueEndingActive) return;
+            this.handleEnding(e.detail.type);
         });
 
         // [AUDIO PRE-START]
@@ -310,7 +322,14 @@ class GameClient {
                     this.player.controls.getObject().position.z += deltaZ;
                     this.generator.mirage.roomGroup.position.z += deltaZ;
 
-                    // 2. Promote
+                    // 2. Promote -> CHECK ENDING "BACK"
+
+                    // Trigger "BACK" Ending Logic
+                    // We must check this BEFORE resetting, because if True Ending triggers, we stop everything.
+                    if (this.handleEnding('BACK')) {
+                        return; // Stop the loop logic if True Ending triggered
+                    }
+
                     this.generator.promoteMirageToIntro();
                     this.insideMirage = false;
 
@@ -425,6 +444,149 @@ class GameClient {
 
         // this.renderer.render(this.scene, this.camera);
         this.composer.render();
+    }
+
+
+    handleEnding(type) {
+        if (this.trueEndingActive) return true;
+
+        console.log(`MAIN: Handling Ending -> ${type}`);
+        this.endingTracker.addEnding(type);
+        console.log(`MAIN: Current History:`, this.endingTracker.history);
+
+        if (this.endingTracker.hasTrueEndingReached()) {
+            const quote = this.endingTracker.getTrueEndingQuote();
+            this.showTrueEnding(quote);
+            return true; // Signal that we intercepted the ending
+        }
+
+        // If not true ending, allow normal flow (or force reload if it came from event)
+        // If 'BACK' (Mirage), we return false to let the loop continue naturally.
+        if (type === 'BACK') return false;
+
+        // If 'DON'T' (Void) or 'LOOK' (Drown), we must reload now because we stopped their default reload.
+        console.log("MAIN: Standard Ending - Reloading...");
+        setTimeout(() => window.location.reload(), 1000);
+        return false;
+    }
+
+    showTrueEnding(quoteData) {
+        console.log("MAIN: *** TRUE ENDING TRIGGERED ***");
+        this.trueEndingActive = true;
+
+        // 1. Stop Game Loop / Audio
+        // We don't stop the loop (animate), but we stop logic updates.
+        // Actually, let's freeze everything.
+
+        // Stop Audio
+        if (this.audioSystem) this.audioSystem.stopAll();
+        if (this.bgMusic) {
+            this.bgMusic.pause();
+            this.bgMusic.volume = 0;
+        }
+
+        // 2. Black Screen
+        const overlay = document.getElementById('fade-overlay'); // Ensure this ID exists or create it
+        if (!overlay) {
+            // Create if missing
+            const div = document.createElement('div');
+            div.id = 'fade-overlay';
+            div.style.position = 'fixed';
+            div.style.top = '0';
+            div.style.left = '0';
+            div.style.width = '100%';
+            div.style.height = '100%';
+            div.style.backgroundColor = 'black';
+            div.style.opacity = '0';
+            div.style.zIndex = '9999';
+            div.style.transition = 'opacity 5s ease-in';
+            document.body.appendChild(div);
+        }
+
+        // Force style if it exists but wasn't ready
+        const finalOverlay = document.getElementById('fade-overlay');
+        finalOverlay.style.transition = 'opacity 5s ease-in';
+        finalOverlay.style.opacity = '1';
+        finalOverlay.style.zIndex = '9999'; // On top of everything
+        finalOverlay.style.pointerEvents = 'all'; // Block clicks
+
+        // 3. Show Quote
+        setTimeout(() => {
+            // A. Combination Header
+            const comboContainer = document.createElement('div');
+            comboContainer.style.position = 'fixed';
+            comboContainer.style.top = '20%';
+            comboContainer.style.width = '100%';
+            comboContainer.style.textAlign = 'center';
+            comboContainer.style.color = '#666666';
+            comboContainer.style.fontFamily = "'Courier New', Courier, monospace";
+            comboContainer.style.zIndex = '10000';
+            comboContainer.style.opacity = '0';
+            comboContainer.style.transition = 'opacity 3s ease-in';
+            comboContainer.style.pointerEvents = 'none';
+
+            // Get last 3 endings
+            const history = this.endingTracker.history.slice(-3);
+            const comboText = document.createElement('h2');
+            comboText.innerText = history.join("   ").toUpperCase();
+            comboText.style.fontSize = '12px';
+            comboText.style.letterSpacing = '6px';
+            comboText.style.fontWeight = 'bold';
+
+            comboContainer.appendChild(comboText);
+            document.body.appendChild(comboContainer);
+
+            // B. Main Quote
+            const container = document.createElement('div');
+            container.style.position = 'fixed';
+            container.style.top = '50%';
+            container.style.left = '50%';
+            container.style.transform = 'translate(-50%, -50%)';
+            container.style.textAlign = 'center';
+            container.style.color = '#eeeeee';
+            container.style.fontFamily = "'Courier New', Courier, monospace";
+            container.style.zIndex = '10000';
+            container.style.opacity = '0';
+            container.style.transition = 'opacity 3s ease-in';
+            container.style.width = '80%';
+
+            const qText = document.createElement('h1');
+            qText.innerText = quoteData.text;
+            qText.style.fontSize = '24px';
+            qText.style.fontWeight = '300';
+            qText.style.marginBottom = '20px';
+            qText.style.lineHeight = '1.5';
+            qText.style.letterSpacing = '1px';
+
+            const qAuthor = document.createElement('p');
+            qAuthor.innerText = `- ${quoteData.author}`;
+            qAuthor.style.fontSize = '18px';
+            qAuthor.style.color = '#888888';
+            qAuthor.style.fontStyle = 'italic';
+
+            container.appendChild(qText);
+            container.appendChild(qAuthor);
+            document.body.appendChild(container);
+
+            // Fade In Quote & Header
+            requestAnimationFrame(() => {
+                container.style.opacity = '1';
+                comboContainer.style.opacity = '1';
+
+                // Enable Click to Reset (after small delay to prevent accidental double-clicks)
+                setTimeout(() => {
+                    const resetHandler = () => {
+                        console.log("MAIN: User clicked - Clearing History & Resetting");
+                        this.endingTracker.clear();
+                        window.location.reload();
+                    };
+                    document.addEventListener('click', resetHandler, { once: true });
+                    // Also allow keypress (Space/Enter)
+                    document.addEventListener('keydown', resetHandler, { once: true });
+                }, 1000);
+            });
+
+        }, 5500); // Appear after screen is fully black
     }
 }
 

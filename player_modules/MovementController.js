@@ -146,14 +146,15 @@ export class MovementController {
                         }
                     }, 2000);
 
-                    // Delayed Reset
+                    // Delayed Reset -> Trigger Ending
                     setTimeout(() => {
                         const msg = document.getElementById('death-message');
                         if (msg) {
                             msg.classList.remove('active');
                             setTimeout(() => msg.innerText = "", 2000);
                         }
-                        window.dispatchEvent(new CustomEvent('reset-simulation'));
+                        // Trigger DON'T Ending
+                        window.dispatchEvent(new CustomEvent('ending-triggered', { detail: { type: 'DON\'T' } }));
                     }, 10000);
                 }
             }

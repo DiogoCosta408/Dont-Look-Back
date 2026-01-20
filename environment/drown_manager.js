@@ -335,10 +335,9 @@ export class DrownManager {
             }
         }, 9000);
 
-        // Wait 10s then Hard Reset
-        setTimeout(() => {
-            location.reload();
-        }, 10000);
+        // Trigger Ending Event instead of direct reload
+        window.dispatchEvent(new CustomEvent('ending-triggered', { detail: { type: 'LOOK' } }));
+        // Fallback reload is handled by Main.js listener if not True Ending
 
         // Fade Out Drown Music (if playing)
         if (this.drownMusic && !this.drownMusic.paused) {
