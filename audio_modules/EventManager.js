@@ -149,4 +149,21 @@ export class EventManager {
 
         this.tinnitusGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.1);
     }
+    silence() {
+        this.stopViolin();
+        if (this.tinnitusGain) {
+            // Fade out over 3 seconds
+            this.tinnitusGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
+            setTimeout(() => {
+                if (this.tinnitusNode) {
+                    try {
+                        this.tinnitusNode.stop();
+                        this.tinnitusNode.disconnect();
+                        this.tinnitusGain.disconnect();
+                    } catch (e) { }
+                    this.tinnitusNode = null;
+                }
+            }, 3000);
+        }
+    }
 }
