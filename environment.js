@@ -198,6 +198,10 @@ export class FacilityGenerator {
         // 3B. Drown Ending
         this.drownManager.update(delta);
 
+        // [FIX] If Drown Ending active, DO NOT run Void/Endgame logic (prevents Void Shield overlap)
+        // REVERT: This blocked Black Hole/Stars too. We need to pass a context flag instead.
+        const drownActive = (this.drownManager.active);
+
         // 4. Endgame Logic
         if (this.stopGeneration || this.isEndgame) {
             let lastZ = 0;
@@ -209,7 +213,8 @@ export class FacilityGenerator {
                 lastZ = lastChunk.position.z - (this.corridor.chunkSize / 2);
             }
 
-            this.endgame.update({ z: playerZ }, lastZ);
+            // Pass drownActive context to prevent Void Shield but allow Background
+            this.endgame.update({ z: playerZ }, lastZ, drownActive);
             this.corridor.cleanupChunks(playerZ);
             return;
         }

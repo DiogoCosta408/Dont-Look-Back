@@ -30,14 +30,14 @@ export class EndgameManager {
         this.distantSun = sun;
     }
 
-    update(playerPos, lastChunkZ = 0) {
+    update(playerPos, lastChunkZ = 0, suppressShield = false) {
         // Initialization if not ready
         if (!this.blackHole && !this.endgameTargetZ) {
 
             // Determine setup positions
             // If passed lastChunkZ, usage:
             let startZ = lastChunkZ;
-            // In original code it checked chunks list. We rely on caller to pass valid startZ or fallback to playerZ
+            // In original code it checked chunks list. We rely on caller to pass valid startZ or fallback to playerPos.z
             if (lastChunkZ === 0) startZ = playerPos.z;
 
             this.endgameTargetZ = startZ - 200;
@@ -51,6 +51,12 @@ export class EndgameManager {
 
             if (this.distantSun) {
                 this.distantSun.position.set(2000, 500, this.endgameTargetZ - 4000);
+            }
+
+            // [VOID SAFEGUARD]
+            // Only create shield if NOT suppressed (i.e. not Drown Ending)
+            if (!suppressShield) {
+                this.createVoidShield(startZ, this.endgameTargetZ);
             }
         }
 
@@ -127,11 +133,6 @@ export class EndgameManager {
         const stars = new THREE.Points(geometry, material);
         stars.frustumCulled = false;
         this.scene.add(stars);
-
-        // [VOID SAFEGUARD]
-        // Giant pitch black square/mask to hide stars from corridor exterior
-        // User Request: Pitch black square size of map... not visible through corridor.
-        this.createVoidShield(startZ, endZ);
     }
 
     createVoidShield(starStartZ, farEndZ) {
