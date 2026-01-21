@@ -154,8 +154,8 @@ export class EventManager {
             if (!this.consumedTime) {
                 this.consumedTime = Date.now();
             }
-            // Check if 3s (3000ms) has passed
-            if (Date.now() - this.consumedTime > 3000) {
+            // Check if 1.5s (1500ms) has passed (User Request: 1.5s)
+            if (Date.now() - this.consumedTime > 1500) {
                 progress = 0; // Silence
             }
             // Else: progress continues as calculated (likely 1.0 -> max vol)

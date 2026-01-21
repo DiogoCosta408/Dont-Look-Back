@@ -252,20 +252,38 @@ class GameClient {
 
             // 1. Spawn Mirage if getting close (Spawn at 70)
             // Trigger early (Z > 5.0) so it's visible from far away
-            // 1. Spawn Mirage if getting close (Spawn at 100)
-            // Trigger early (Z > 5.0) so it's visible from far away
-            if (pZ > 5.0) {
+            // 1. Dynamic Mirage Spawn (User Request)
+            // "spawns a large distance based if the player runs back for more than 5 seconds"
+            // "same absolute distance as it is set for the intro-mirage distance" (100)
+
+            this.runBackTimer = this.runBackTimer || 0;
+            const velocityZ = this.player.movement.velocity.z;
+
+            // Check if running back (Velocity Z > 1.0)
+            if (velocityZ > 1.0) {
+                this.runBackTimer += delta;
+            } else {
+                this.runBackTimer = 0;
+            }
+
+            if (this.runBackTimer > 5.0) {
                 if (!this.generator.mirage.roomGroup) {
-                    this.generator.createMirageRoom(100);
+                    this.mirageSpawnZ = pZ + 100;
+                    this.generator.createMirageRoom(this.mirageSpawnZ);
+                    // Reset timer to allow it to "settle" or prevent spam? 
+                    // createMirageRoom checks if roomGroup exists, so it's safe.
                 }
             }
 
             // 2. Loop Logic
             if (this.generator.mirage.roomGroup) {
-                // Room at 100. Door at 100 + (-2) = 98.
+                // Determine Entry Threshold dynamically
+                // If mirageSpawnZ is set, use it. Default to 100 if somehow missing (legacy fallback).
+                const targetZ = this.mirageSpawnZ || 100;
+                const entryThreshold = targetZ - 1.5; // Door is at Z - 2 roughly
 
                 // ENTERING (Pass Threshold)
-                if (pZ > 98.5 && !this.insideMirage) {
+                if (pZ > entryThreshold && !this.insideMirage) {
                     this.insideMirage = true;
 
                     // RESET STATE ON ENTRY (Sanctuary)
@@ -312,15 +330,22 @@ class GameClient {
                 }
 
                 // LEAVING (Teleport -> Seamless Shift)
-                if (this.insideMirage && pZ < 97.0) {
+                const exitThreshold = (this.mirageSpawnZ || 100) - 3.0; // 97.0 relative to 100
+
+                if (this.insideMirage && pZ < exitThreshold) {
                     console.log("MAIN: Loop Seamless Transition");
 
                     // 1. Calculate Shift
-                    // New Center = 4. Old Center = 100. Delta = 4 - 100 = -96.
-                    const deltaZ = 4.0 - 100.0;
+                    // New Center = 4. Old Center = mirageSpawnZ.
+                    const currentCenter = this.mirageSpawnZ || 100;
+                    const deltaZ = 4.0 - currentCenter;
 
                     this.player.controls.getObject().position.z += deltaZ;
                     this.generator.mirage.roomGroup.position.z += deltaZ;
+
+                    // Clear dynamic spawn Z so next time it recalculates
+                    this.mirageSpawnZ = null;
+                    this.runBackTimer = 0; // Ensure timer is clean
 
                     // 2. Promote -> CHECK ENDING "BACK"
 
