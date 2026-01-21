@@ -67,6 +67,13 @@ export class AudioSystem {
         if (this.eventAudio.silence) this.eventAudio.silence();
     }
 
+    muteMaster() {
+        if (this.masterGain) {
+            this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+            this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        }
+    }
+
     reset() {
         if (this.ambient.reset) this.ambient.reset();
         if (this.psych.reset) this.psych.reset();

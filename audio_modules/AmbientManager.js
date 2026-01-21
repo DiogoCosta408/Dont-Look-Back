@@ -116,8 +116,22 @@ export class AmbientManager {
         if (this.pressureFilter) {
             this.pressureFilter.gain.setValueAtTime(0, this.ctx.currentTime);
         }
-        // Cut Hum
-        this.stopHum();
+
+        // Cut Hum Instantly
+        this.isHumming = false;
+        if (this.humGain) {
+            try {
+                this.humGain.gain.cancelScheduledValues(this.ctx.currentTime);
+                this.humGain.gain.setValueAtTime(0, this.ctx.currentTime);
+                this.humGain.disconnect();
+            } catch (e) { }
+        }
+        if (this.humOsc) { try { this.humOsc.stop(); } catch (e) { } }
+        if (this.humOsc2) { try { this.humOsc2.stop(); } catch (e) { } }
+
+        this.humOsc = null;
+        this.humOsc2 = null;
+        this.humGain = null;
     }
 
     reset() {

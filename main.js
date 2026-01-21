@@ -479,7 +479,10 @@ class GameClient {
         // Actually, let's freeze everything.
 
         // Stop Audio
-        if (this.audioSystem) this.audioSystem.stopAll();
+        if (this.audioSystem) {
+            this.audioSystem.stopAll();
+            this.audioSystem.muteMaster(); // Absolute Silence (User Request)
+        }
         if (this.bgMusic) {
             this.bgMusic.pause();
             this.bgMusic.volume = 0;

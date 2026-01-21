@@ -172,18 +172,18 @@ export class EventManager {
     silence() {
         this.stopViolin();
         if (this.tinnitusGain) {
-            // Fade out over 3 seconds
-            this.tinnitusGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5);
-            setTimeout(() => {
-                if (this.tinnitusNode) {
-                    try {
-                        this.tinnitusNode.stop();
-                        this.tinnitusNode.disconnect();
-                        this.tinnitusGain.disconnect();
-                    } catch (e) { }
-                    this.tinnitusNode = null;
-                }
-            }, 3000);
+            // Instant Silence
+            try {
+                this.tinnitusGain.gain.setValueAtTime(0, this.ctx.currentTime);
+                this.tinnitusGain.disconnect();
+            } catch (e) { }
+        }
+        if (this.tinnitusNode) {
+            try {
+                this.tinnitusNode.stop();
+                this.tinnitusNode.disconnect();
+            } catch (e) { }
+            this.tinnitusNode = null;
         }
     }
 }
