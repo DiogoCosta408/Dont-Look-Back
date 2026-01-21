@@ -120,6 +120,7 @@ export class EventManager {
 
     // --- TINNITUS ---
     manageTinnitus(delta, metrics) {
+        if (!this.consumedTime) this.consumedTime = 0;
         const dist = metrics.distToVoid || 9999;
 
         // Trigger PAST edge (200 units offset from BH)
@@ -144,8 +145,27 @@ export class EventManager {
         }
 
         const range = 200;
-        const progress = Math.max(0, Math.min((range - dist) / range, 1.0));
-        const targetVol = progress * 0.1;
+        let progress = Math.max(0, Math.min((range - dist) / range, 1.0));
+
+        // [CONSUMED BY VOID]
+        // If dist < 45, we are inside/consumed.
+        // User Request: Stop 3s after entering.
+        if (dist < 45) {
+            if (!this.consumedTime) {
+                this.consumedTime = Date.now();
+            }
+            // Check if 3s (3000ms) has passed
+            if (Date.now() - this.consumedTime > 3000) {
+                progress = 0; // Silence
+            }
+            // Else: progress continues as calculated (likely 1.0 -> max vol)
+        } else {
+            this.consumedTime = 0; // Reset if we step out? Or keep it?
+            // Usually stepping out means we aren't consumed.
+        }
+
+        // Target volume based on proximity (LOWERED 50% - User Request: 0.1 -> 0.05)
+        const targetVol = progress * 0.05;
 
         this.tinnitusGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.1);
     }
