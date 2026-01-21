@@ -127,6 +127,43 @@ export class EndgameManager {
         const stars = new THREE.Points(geometry, material);
         stars.frustumCulled = false;
         this.scene.add(stars);
+
+        // [VOID SAFEGUARD]
+        // Giant pitch black square/mask to hide stars from corridor exterior
+        // User Request: Pitch black square size of map... not visible through corridor.
+        this.createVoidShield(startZ, endZ);
+    }
+
+    createVoidShield(starStartZ, farEndZ) {
+        // 1. The "Mask" at the start of the Void (corridorEndZ)
+        // Solid black wall with a hole for the corridor path.
+        const shape = new THREE.Shape();
+        const size = 5000;
+        // Outer Square
+        shape.moveTo(-size, -size);
+        shape.lineTo(size, -size);
+        shape.lineTo(size, size);
+        shape.lineTo(-size, size);
+        shape.lineTo(-size, -size);
+
+        // Inner Hole (The Corridor / Tunnel entry)
+        // Corridor is roughly 6x5.
+        // Let's do a square hole 8x8 to be safe.
+        const hole = new THREE.Path();
+        const hSize = 5;
+        hole.moveTo(-hSize, -hSize);
+        hole.lineTo(hSize, -hSize);
+        hole.lineTo(hSize, hSize);
+        hole.lineTo(-hSize, hSize);
+        hole.lineTo(-hSize, -hSize);
+        shape.holes.push(hole);
+
+        const maskGeo = new THREE.ShapeGeometry(shape);
+        const blackMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+
+        const mask = new THREE.Mesh(maskGeo, blackMat);
+        mask.position.set(0, 0, starStartZ - 1.0); // Just behind the transition line
+        this.scene.add(mask);
     }
 
     createBlackHole() {
