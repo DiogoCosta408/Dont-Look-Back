@@ -257,14 +257,25 @@ class GameClient {
             // "same absolute distance as it is set for the intro-mirage distance" (100)
 
             this.runBackTimer = this.runBackTimer || 0;
-            const velocityZ = this.player.movement.velocity.z;
+            this.runBackTimer = this.runBackTimer || 0;
 
-            // Check if running back (Velocity Z > 1.0)
-            if (velocityZ > 1.0) {
-                this.runBackTimer += delta;
-            } else {
-                this.runBackTimer = 0;
+            // Fix: Use World Z Delta to detect "Running Back" (Moving in +Z)
+            // This works even if the player turns around (Look Back) and presses W.
+            const currentZ = this.player.controls.getObject().position.z;
+
+            if (this.lastPlayerZ !== undefined) {
+                // Calculate World Velocity
+                const zDist = currentZ - this.lastPlayerZ;
+                const worldVelZ = zDist / delta;
+
+                // Check if moving +Z (Back towards start) significantly
+                if (worldVelZ > 2.0) { // Threshold 2.0 (Run speed is ~4.0)
+                    this.runBackTimer += delta;
+                } else {
+                    this.runBackTimer = 0;
+                }
             }
+            this.lastPlayerZ = currentZ;
 
             if (this.runBackTimer > 5.0) {
                 if (!this.generator.mirage.roomGroup) {
