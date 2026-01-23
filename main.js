@@ -257,7 +257,6 @@ class GameClient {
             // "same absolute distance as it is set for the intro-mirage distance" (100)
 
             this.runBackTimer = this.runBackTimer || 0;
-            this.runBackTimer = this.runBackTimer || 0;
 
             // Fix: Use World Z Delta to detect "Running Back" (Moving in +Z)
             // This works even if the player turns around (Look Back) and presses W.

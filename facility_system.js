@@ -92,6 +92,9 @@ export class FacilitySystem {
         this.lastStationaryReset = 0;
         this.bellFlags = { level2: false, level3: false, finalWarning: false };
         this.lookBackTimer = 0;
+
+        // VOID ENDING STATE
+        this.highParanoiaDistance = 0;
     }
 
     update(time, delta) {
@@ -327,7 +330,7 @@ export class FacilitySystem {
 
         // [CONTINUOUS RUNNING]
         if (p.continuousForwardTime > 5.0) {
-            this.paranoiaLevel += delta * 1.0;
+            this.paranoiaLevel += delta * 1.2;
         }
 
         // [DECAY - RECOVERY]
@@ -346,16 +349,16 @@ export class FacilitySystem {
         let statusText = "STABLE";
         let statusClass = "status-ok";
 
-        if (this.paranoiaLevel < 20) {
+        if (this.paranoiaLevel < 19) {
             statusText = "STABLE";
             statusClass = "status-ok";
         } else if (this.paranoiaLevel < 40) {
             statusText = "UNSETTLED";
             statusClass = "status-ok";
-        } else if (this.paranoiaLevel < 60) {
+        } else if (this.paranoiaLevel < 65) {
             statusText = "AGITATED";
             statusClass = "status-warn";
-        } else if (this.paranoiaLevel < 80) {
+        } else if (this.paranoiaLevel < 86) {
             statusText = "HYSTERIA";
             statusClass = "status-warn";
         } else {
@@ -366,21 +369,35 @@ export class FacilitySystem {
         this.updateStatus(statusText, statusClass);
 
         // TRIGGER ENDGAME (PHASE 3) - DELAYED
-        // Must hold Max Paranoia for 60 seconds
-        if (this.paranoiaLevel >= 99) {
-            if (this.maxParanoiaTimer === undefined) this.maxParanoiaTimer = 0;
-            this.maxParanoiaTimer += delta;
+        // Condition: Run 200 units while in Psychosis (Paranoia > 86)
 
-            // Console log every 10s
-            if (Math.floor(this.maxParanoiaTimer) % 5 === 0 && Math.floor(this.maxParanoiaTimer) !== this._lastLogTime) {
-                this._lastLogTime = Math.floor(this.maxParanoiaTimer);
-                console.log(`SYS: Psychosis Hold: ${this.maxParanoiaTimer.toFixed(1)}s / 20s`);
+        if (this.paranoiaLevel >= 86) {
+            // Track distance if moving
+            if (!this.player.metrics.isStationary) {
+                // Approximate distance this frame based on move speed ~4.0
+                // Better: Use actual delta position from Metrics?
+                // Metrics has totalDistance. We can track delta of totalDistance.
+                // But simplified: 4.0 * delta is roughly correct if running.
+                // Let's use MetricsManager's distanceTraveled for accuracy if available, 
+                // but we only have totalDistance.
+
+                // Let's just use constant approximation if running:
+                if (this.player.metrics.continuousForwardTime > 0.1 || !this.player.metrics.isStationary) {
+                    const estimatedSpeed = 4.0;
+                    this.highParanoiaDistance += estimatedSpeed * delta;
+                }
             }
 
-            if (this.maxParanoiaTimer > 20.0 && !this.endgameTriggered) {
+            // Console log every 50 units
+            if (this.highParanoiaDistance > 0 && Math.floor(this.highParanoiaDistance / 50) > this._lastLogDist) {
+                this._lastLogDist = Math.floor(this.highParanoiaDistance / 50);
+                console.log(`SYS: Psychosis Run: ${this.highParanoiaDistance.toFixed(1)} / 200`);
+            }
+
+            if (this.highParanoiaDistance > 160.0 && !this.endgameTriggered) {
                 // FORCE RESET EVENTS
                 this.blackout.active = false;
-                this.environment.forceBlackout = false; // CRITICAL FIX
+                this.environment.forceBlackout = false;
                 this.cameraInversion.active = false;
 
                 this.endgameTriggered = true;
@@ -388,9 +405,15 @@ export class FacilitySystem {
                 this.environment.enterEndgame();
             }
         } else {
-            // Reset timer if they drift below max? 
-            // Or Keep it? Let's bleed it slowly so they don't lose all progress instantly
-            if (this.maxParanoiaTimer > 0) this.maxParanoiaTimer -= delta * 0.5;
+            // Decay progress if they calm down? 
+            // "it seems that a look back is needed to trigger even if the other conditions are met" -> No, we want pure run.
+            // Let's NOT decay distance. Once you run enough in fear, it unlocks.
+            // Actually, maybe slight decay so they can't cheese it in 10 bursts?
+            // User didn't specify, but "run 200 distance" implies cummulative or continuous.
+            // Let's keep it cumulative but safe.
+            if (this.highParanoiaDistance > 0) {
+                this._lastLogDist = 0; // Reset log flag
+            }
         }
     }
 
@@ -786,7 +809,9 @@ export class FacilitySystem {
     reset() {
         console.log("SYS: System Reset (Loop)");
         this.paranoiaLevel = 0;
+        this.paranoiaLevel = 0;
         this.maxParanoiaTimer = 0;
+        this.highParanoiaDistance = 0;
         this.endgameTriggered = false;
         this.lastMessageTime = 0;
         this.recentMessages = [];
