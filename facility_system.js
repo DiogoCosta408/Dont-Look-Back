@@ -61,7 +61,7 @@ export class FacilitySystem {
             ],
             highParanoia: [
                 "THEY WON'T GET YOU",
-                "DONT TURN AROUND",
+                "DON'T TURN AROUND",
                 "IT IS GETTING CLOSER",
                 "RUN",
             ],
@@ -77,10 +77,10 @@ export class FacilitySystem {
                 "Drifting away..."
             ],
             instinctiveDoubt: [
+                "DON'T LET GO",
                 "SHOULD YOU LOOK?",
                 "WILL YOU IGNORE IT?",
                 "AM I SAFE?",
-                "DON'T LET GO",
                 "WHY ARE YOU CALM?"
             ],
             longLookBack: [
