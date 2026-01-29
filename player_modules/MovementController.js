@@ -33,7 +33,7 @@ export class MovementController {
         this.enabled = true;
     }
 
-    update(delta, isEndgame, blackHolePos, edgeZ, isIntro = false, pillarPositions = []) {
+    update(delta, isEndgame, blackHolePos, edgeZ, isIntro = false, pillarPositions = [], mirageZ = null) {
         // Clamp delta
         const timeStep = Math.min(delta, 0.1);
         const playerPos = this.controls.getObject().position;
@@ -73,6 +73,33 @@ export class MovementController {
             if (playerPos.z < 2.2) {
                 if (Math.abs(playerPos.x) > 0.6) playerPos.z = 2.2;
             }
+            return;
+        }
+
+        // [MIRAGE ROOM COLLISION]
+        if (typeof mirageZ === 'number') {
+            // Intro Center is 4.0. Mirage Center is mirageZ. Offset = mirageZ - 4.0.
+            // Bounds Map:
+            // Back Wall: 5.8 -> 5.8 + (mirageZ - 4.0) = mirageZ + 1.8
+            // Side Wall: +/- 1.8 (Unchanged in Width)
+            // Door Z: 2.2 -> 2.2 + (mirageZ - 4.0) = mirageZ - 1.8
+
+            const backWallZ = mirageZ + 1.8;
+            const doorZ = mirageZ - 1.8;
+
+            if (playerPos.z > backWallZ) playerPos.z = backWallZ;
+            if (playerPos.x > 1.8) playerPos.x = 1.8;
+            if (playerPos.x < -1.8) playerPos.x = -1.8;
+
+            if (playerPos.z < doorZ) {
+                // If trying to walk out the door, constrain X (door frame)
+                if (Math.abs(playerPos.x) > 0.6) playerPos.z = doorZ;
+            }
+            // Do NOT return here if we want standard corridor physics to apply partially? 
+            // In Intro we return to skip regular walking limits?
+            // "Regular walking" limits x to 2.5 (line 175). Mirage/Intro is narrower (1.8).
+            // So we should return to avoid overriding or being overridden.
+            // Intro logic returns, so we return too.
             return;
         }
 

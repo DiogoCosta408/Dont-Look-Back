@@ -394,6 +394,12 @@ class GameClient {
 
         // Pass State to Player (Collisions, Effects)
         const bhPos = this.generator.blackHole ? this.generator.blackHole.position : null;
+
+        let mirageZ = null;
+        if (this.insideMirage) {
+            mirageZ = this.mirageSpawnZ || 100;
+        }
+
         this.player.update(
             delta,
             this.generator.interactables,
@@ -402,7 +408,8 @@ class GameClient {
             this.generator.isEndgame,
             bhPos,
             this.generator.corridorEndZ,
-            (this.currentZone === 'INTRO') // Pass isIntro flag
+            (this.currentZone === 'INTRO'), // Pass isIntro flag
+            mirageZ // Pass mirageZ
         );
 
         // --- GAME LOOP ---
