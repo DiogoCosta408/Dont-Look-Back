@@ -141,6 +141,9 @@ class GameClient {
         this.generator.createIntroRoom();
         this.player.controls.getObject().position.set(0, 1.6, 5);
         if (this.audioSystem.startClock) this.audioSystem.startClock();
+
+        // [ENDING HISTROY CHECK]
+        this.checkConsecutiveEndings();
     }
 
     enterCorridor() {
@@ -371,6 +374,7 @@ class GameClient {
                     // 3. Reset System State
                     this.system.reset();
                     this.currentZone = 'INTRO';
+                    this.checkConsecutiveEndings();
 
                     // 4. Generate World Behind Door
                     this.generator.corridor.chunks.forEach(c => this.scene.remove(c));
@@ -633,6 +637,29 @@ class GameClient {
 
         }, 5500); // Appear after screen is fully black
     }
-}
+    checkConsecutiveEndings() {
+        if (this.endingTracker && this.endingTracker.history.length >= 2) {
+            const h = this.endingTracker.history;
+            const last = h[h.length - 1];
+            const prev = h[h.length - 2];
 
+            if (last === prev) {
+                setTimeout(() => {
+                    const voiceOverlay = document.getElementById('voice-overlay');
+                    if (voiceOverlay) {
+                        const msg = document.createElement('div');
+                        msg.innerText = "SAME ACTIONS WILL BRING THE SAME END";
+                        msg.classList.add('voice-entry');
+                        msg.style.color = '#ffb000'; // Yellow (CRT Color)
+                        voiceOverlay.appendChild(msg);
+
+                        setTimeout(() => {
+                            if (msg.parentNode) msg.parentNode.removeChild(msg);
+                        }, 4000);
+                    }
+                }, 1500);
+            }
+        }
+    }
+}
 new GameClient();

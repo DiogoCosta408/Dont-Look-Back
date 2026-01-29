@@ -82,6 +82,13 @@ export class FacilitySystem {
                 "AM I SAFE?",
                 "DON'T LET GO",
                 "WHY ARE YOU CALM?"
+            ],
+            longLookBack: [
+                "I WANT TO GO HOME",
+                "I MISS HOW IT WAS",
+                "TAKE ME BACK",
+                "WHY DID I LEAVE?",
+                "IT WAS BETTER BEFORE"
             ]
         };
 
@@ -666,8 +673,15 @@ export class FacilitySystem {
             }
 
             // 2. Look Back
-            if (!selectedPool && p.isLookingBack && Math.random() < 0.3) {
-                selectedPool = "lookBack";
+            if (!selectedPool && p.isLookingBack) {
+                // [LONG LOOK BACK] (> 3s)
+                if (this.lookBackTimer > 3.0 && Math.random() < 0.4) {
+                    selectedPool = "longLookBack";
+                }
+                // Standard Look Back
+                else if (Math.random() < 0.3) {
+                    selectedPool = "lookBack";
+                }
             }
 
             // 3. Stationary

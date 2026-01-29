@@ -335,8 +335,11 @@ export class DrownManager {
             }
         }, 9000);
 
-        // Trigger Ending Event instead of direct reload
-        window.dispatchEvent(new CustomEvent('ending-triggered', { detail: { type: 'LOOK' } }));
+        // Trigger Ending Event instead of direct reload (Delayed)
+        setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('ending-triggered', { detail: { type: 'LOOK' } }));
+        }, 10000);
+
         // Fallback reload is handled by Main.js listener if not True Ending
 
         // Fade Out Drown Music (if playing)
