@@ -330,7 +330,10 @@ export class IntroRoom {
         });
 
         // --- TABLE ---
-        const tableTex = texLoader.load('textures/table_texture.png');
+        let tableTexPath = 'textures/table_texture.png';
+        if (variantLevel === 1) tableTexPath = 'textures/old_wood_black.jpg';
+        else if (isMirage && variantLevel === 0) tableTexPath = 'textures/white_wood.jpg';
+        const tableTex = texLoader.load(tableTexPath);
         const tableMat = new THREE.MeshStandardMaterial({ map: tableTex, color: 0x888888, roughness: 0.5, metalness: 0.1 });
         const drawerMat = new THREE.MeshStandardMaterial({ map: tableTex, color: 0x777777, roughness: 0.5 });
 
@@ -354,9 +357,13 @@ export class IntroRoom {
         }
 
         // Note
+        let paperTexPath = 'textures/paper.png';
+        if (variantLevel === 1) paperTexPath = 'textures/crayon_paint.jpg';
+        else if (isMirage && variantLevel === 0) paperTexPath = 'textures/dontlookback.jpg';
+
         const paper = new THREE.Mesh(
             new THREE.PlaneGeometry(0.2, 0.3),
-            new THREE.MeshStandardMaterial({ map: texLoader.load('textures/paper.png'), side: THREE.DoubleSide })
+            new THREE.MeshStandardMaterial({ map: texLoader.load(paperTexPath), side: THREE.DoubleSide })
         );
         paper.position.set(0, 0.305, 0);
         paper.rotation.x = -Math.PI / 2;
@@ -394,7 +401,10 @@ export class IntroRoom {
 
         // --- CARPET ---
         if (variantLevel < 2) {
-            const carpetTex = (variantLevel === 1) ? 'textures/carpet_mirage_room_2.jpg' : 'textures/carpet.png';
+            let carpetTex = 'textures/carpet.png';
+            if (variantLevel === 1) carpetTex = 'textures/carpet_mirage_room_2.jpg';
+            else if (isMirage && variantLevel === 0) carpetTex = 'textures/basket_carpet.jpg';
+
             const carpet = new THREE.Mesh(
                 new THREE.BoxGeometry(1.6, 0.01, 2.2),
                 new THREE.MeshStandardMaterial({ map: texLoader.load(carpetTex), roughness: 1.0 })

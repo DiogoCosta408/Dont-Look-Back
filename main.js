@@ -228,8 +228,8 @@ class GameClient {
         if (this.currentZone === 'INTRO') {
             // [ZONE: INTRO]
             // Retry starting clock if loaded but not playing (e.g., loaded after start)
-            // VARIANT 3 (2) SILENCE CHECK
-            const isSilentVariant = this.generator.intro.clockVariant === 2;
+            // VARIANT 3 (2+) SILENCE CHECK
+            const isSilentVariant = this.generator.intro.clockVariant >= 2;
 
             if (!isSilentVariant && this.audioSystem.clockBuffer && !this.audioSystem.isClockPlaying) {
                 this.audioSystem.startClock();
@@ -256,6 +256,11 @@ class GameClient {
                 pFactor = 0.0;
                 this.system.cameraInversion.active = false;
                 this.player.cameraController.reset();
+
+                // FORCE SILENCE (Double Check)
+                if (this.generator.mirage && this.generator.mirage.clockVariant >= 2) {
+                    if (this.audioSystem.isClockPlaying) this.audioSystem.stopClock();
+                }
             }
             this.system.updateClock(delta);
 
@@ -313,6 +318,7 @@ class GameClient {
                 // ENTERING (Pass Threshold)
                 if (pZ > entryThreshold && !this.insideMirage) {
                     this.insideMirage = true;
+                    console.log("MAIN: Entered Mirage. ClockVariant:", this.generator.mirage ? this.generator.mirage.clockVariant : 'N/A');
 
                     // RESET STATE ON ENTRY (Sanctuary)
 
@@ -342,8 +348,8 @@ class GameClient {
                     // Start Clocks
                     this.generator.startMirageClock();
 
-                    // SILENCE CHECK FOR VARIANT 3 (2)
-                    const isSilent = this.generator.mirage && this.generator.mirage.clockVariant === 2;
+                    // SILENCE CHECK FOR VARIANT 3 (2+)
+                    const isSilent = this.generator.mirage && this.generator.mirage.clockVariant >= 2;
 
                     if (isSilent) {
                         if (this.audioSystem.stopClock) this.audioSystem.stopClock();
