@@ -228,7 +228,10 @@ class GameClient {
         if (this.currentZone === 'INTRO') {
             // [ZONE: INTRO]
             // Retry starting clock if loaded but not playing (e.g., loaded after start)
-            if (this.audioSystem.clockBuffer && !this.audioSystem.isClockPlaying) {
+            // VARIANT 3 (2) SILENCE CHECK
+            const isSilentVariant = this.generator.intro.clockVariant === 2;
+
+            if (!isSilentVariant && this.audioSystem.clockBuffer && !this.audioSystem.isClockPlaying) {
                 this.audioSystem.startClock();
             }
 
@@ -338,7 +341,15 @@ class GameClient {
 
                     // Start Clocks
                     this.generator.startMirageClock();
-                    if (this.audioSystem.startClock) this.audioSystem.startClock();
+
+                    // SILENCE CHECK FOR VARIANT 3 (2)
+                    const isSilent = this.generator.mirage && this.generator.mirage.clockVariant === 2;
+
+                    if (isSilent) {
+                        if (this.audioSystem.stopClock) this.audioSystem.stopClock();
+                    } else {
+                        if (this.audioSystem.startClock) this.audioSystem.startClock();
+                    }
 
                     // DEBUG: Trace rotation for next 120 frames
                     this.debugRotationLog = 120;

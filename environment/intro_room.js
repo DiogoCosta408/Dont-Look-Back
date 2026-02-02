@@ -226,6 +226,7 @@ export class IntroRoom {
     }
 
     createFurnishings(texLoader, frameTex, frameMat, isMirage = false, variantLevel = 0) {
+        console.log("SYS: createFurnishings variantLevel:", variantLevel);
 
         // VARIANT 2: Simple Wooden Chair ONLY
         if (variantLevel === 2) {
@@ -276,7 +277,8 @@ export class IntroRoom {
         }
 
         // VARIANT 0/1: Sofa & Table
-        const sofaTex = texLoader.load('textures/sofa_texture.png');
+        const sofaTexPath = (variantLevel === 1) ? 'textures/old_sofa.jpg' : 'textures/sofa_texture.png';
+        const sofaTex = texLoader.load(sofaTexPath);
         const sofaMat = new THREE.MeshStandardMaterial({ map: sofaTex, color: 0x888888, roughness: 0.8 });
 
         // --- SOFA ---
@@ -391,12 +393,15 @@ export class IntroRoom {
         this.roomGroup.add(this.clockMesh);
 
         // --- CARPET ---
-        const carpet = new THREE.Mesh(
-            new THREE.BoxGeometry(1.6, 0.01, 2.2),
-            new THREE.MeshStandardMaterial({ map: texLoader.load('textures/carpet.png'), roughness: 1.0 })
-        );
-        carpet.position.set(0, 0.006, 0.5);
-        this.roomGroup.add(carpet);
+        if (variantLevel < 2) {
+            const carpetTex = (variantLevel === 1) ? 'textures/carpet_mirage_room_2.jpg' : 'textures/carpet.png';
+            const carpet = new THREE.Mesh(
+                new THREE.BoxGeometry(1.6, 0.01, 2.2),
+                new THREE.MeshStandardMaterial({ map: texLoader.load(carpetTex), roughness: 1.0 })
+            );
+            carpet.position.set(0, 0.006, 0.5);
+            this.roomGroup.add(carpet);
+        }
 
         // --- LAMP (Right of Table) ---
         // VARIANT 3 (Level 2): Ceiling Lamp ONLY. No table lamp.
