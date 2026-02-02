@@ -230,7 +230,8 @@ export class IntroRoom {
         // VARIANT 2: Simple Wooden Chair ONLY
         if (variantLevel === 2) {
             const chairGroup = new THREE.Group();
-            chairGroup.position.set(-1.0, 0, 0); // Centered relative to where sofa was
+            chairGroup.position.set(0, 0, 0.5); // Centered in room, slightly back
+            chairGroup.rotation.y = Math.PI; // Face Back Wall (where painting is)
             this.roomGroup.add(chairGroup);
 
             const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
@@ -371,7 +372,7 @@ export class IntroRoom {
         // Canvas
         let portraitTex;
         if (variantLevel === 2) portraitTex = 'textures/mirage_3.jpg';
-        else if (variantLevel === 1) portraitTex = 'textures/mirage_2.jpg';
+        else if (variantLevel === 1) portraitTex = 'textures/time_transfixed.webp';
         else portraitTex = isMirage ? 'textures/nottobereproduced.jpg' : 'textures/fractal.png';
 
         const portrait = new THREE.Mesh(
