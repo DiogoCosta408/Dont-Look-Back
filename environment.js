@@ -100,11 +100,11 @@ export class FacilityGenerator {
     }
 
     // [DARKNESS LOOP API]
-    createMirageRoom(z) {
+    createMirageRoom(z, backEndingCount = 0) {
         if (!this.mirage.roomGroup) {
             // Updated to pass false for autoStartClock, true for isMirage
-            this.mirage.create(new THREE.Vector3(0, 0, z), false, true);
-            console.log(`ENV: Created Mirage Room at Z=${z} (Clock Paused, Black Shell)`);
+            this.mirage.create(new THREE.Vector3(0, 0, z), false, true, backEndingCount);
+            console.log(`ENV: Created Mirage Room at Z=${z} (Clock Paused, Black Shell, BackCount=${backEndingCount})`);
         }
     }
 

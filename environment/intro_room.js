@@ -16,7 +16,7 @@ export class IntroRoom {
         this.introLightPanel = null;
     }
 
-    create(positionOffset = new THREE.Vector3(0, 0, 4), autoStartClock = true, isMirage = false) {
+    create(positionOffset = new THREE.Vector3(0, 0, 4), autoStartClock = true, isMirage = false, backEndingCount = 0) {
         this.clockRunning = autoStartClock;
         if (this.clockRunning) {
             this.clockStartTime = Date.now();
@@ -33,18 +33,20 @@ export class IntroRoom {
 
         const texLoader = new THREE.TextureLoader();
 
-        // (Rest of geometry creation omitted for brevity, logic continues below)
-        // ...
+        // [TEXTURE LOGIC]
+        // Standard: floor_tile.png (Intro) / floor_tile2.png (Mirage 1)
+        // Variant: checkered_floor.jpg (Walls/Floor/Ceiling)
 
-        // Wait, replace_file_content replaces the WHOLE block targetted.
-        // I need to be careful not to delete the walls/floor code if I target a large chunk without providing it back.
-        // But the instruction says "Update create signature".
-        // Use a smaller chunk target for just the top of functions if possible, or provide full content for safety.
-        // Given I need to inject `this.clockRunning`... I will target the top of `create`.
-
+        const isVariant = (isMirage && backEndingCount >= 1);
 
         // Floor
-        const floorTexName = isMirage ? 'textures/floor_tile2.png' : 'textures/floor_tile.png';
+        let floorTexName;
+        if (isVariant) {
+            floorTexName = 'textures/checkered_floor.jpg';
+        } else {
+            floorTexName = isMirage ? 'textures/floor_tile2.png' : 'textures/floor_tile.png';
+        }
+
         const floorTex = texLoader.load(floorTexName);
         floorTex.wrapS = THREE.RepeatWrapping;
         floorTex.wrapT = THREE.RepeatWrapping;
@@ -56,14 +58,26 @@ export class IntroRoom {
         this.roomGroup.add(floor);
 
         // Ceiling
-        const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
+        // Variant: Checkered. Standard: Dark Gray Color.
+        let ceilingMat;
+        if (isVariant) {
+            const ceilTex = texLoader.load('textures/checkered_floor.jpg');
+            ceilTex.wrapS = THREE.RepeatWrapping;
+            ceilTex.wrapT = THREE.RepeatWrapping;
+            ceilTex.repeat.set(2, 2);
+            ceilingMat = new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 0.9 });
+        } else {
+            ceilingMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
+        }
+
         const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), ceilingMat);
         ceiling.rotation.x = Math.PI / 2;
         ceiling.position.y = height;
         this.roomGroup.add(ceiling);
 
         // Walls
-        const wallTex = texLoader.load('textures/intro_room_walls.png');
+        const wallTexName = isVariant ? 'textures/checkered_floor.jpg' : 'textures/intro_room_walls.png';
+        const wallTex = texLoader.load(wallTexName);
         wallTex.wrapS = THREE.RepeatWrapping;
         wallTex.wrapT = THREE.RepeatWrapping;
         wallTex.repeat.set(2, 2);
@@ -123,9 +137,9 @@ export class IntroRoom {
         this.roomGroup.add(headBeam);
 
         // ASSETS
-        this.createFurnishings(texLoader, dFrameTex, dFrameMat, isMirage);
+        this.createFurnishings(texLoader, dFrameTex, dFrameMat, isMirage, isVariant);
 
-        this.createLighting(texLoader, height);
+        this.createLighting(texLoader, height, isVariant);
 
         // [OUTER SHELL]
         // Disabled to debug "Ceiling/Floor" confusion
@@ -176,7 +190,7 @@ export class IntroRoom {
         // Primarily side/back/top. Front is where you enter.
     }
 
-    createFurnishings(texLoader, frameTex, frameMat, isMirage = false) {
+    createFurnishings(texLoader, frameTex, frameMat, isMirage = false, isVariant = false) {
         // Since frameEx was a typo in arg list just above, fixing:
         // Re-load if needed or use existing.
         // Actually I passed dFrameMat but also need dFrameTex reference maybe?
@@ -276,7 +290,13 @@ export class IntroRoom {
         this.interactables.push(frame);
 
         // Canvas
-        const portraitTex = isMirage ? 'textures/nottobereproduced.jpg' : 'textures/fractal.png';
+        let portraitTex;
+        if (isVariant) {
+            portraitTex = 'textures/mirage_2.jpg';
+        } else {
+            portraitTex = isMirage ? 'textures/nottobereproduced.jpg' : 'textures/fractal.png';
+        }
+
         const portrait = new THREE.Mesh(
             new THREE.PlaneGeometry(1.5, 2.0),
             new THREE.MeshBasicMaterial({ map: texLoader.load(portraitTex), color: 0x999999 })
@@ -341,26 +361,86 @@ export class IntroRoom {
         this.roomGroup.add(lampGroup);
     }
 
-    createLighting(texLoader, height) {
-        const fixture = new THREE.Mesh(
-            new THREE.BoxGeometry(0.6, 0.1, 1.2),
-            new THREE.MeshStandardMaterial({ color: 0x222222 })
-        );
-        fixture.position.set(0, height - 0.05, 0);
-        this.roomGroup.add(fixture);
+    createLighting(texLoader, height, isVariant = false) {
+        if (isVariant) {
+            // [VARIANT: Conical Spring Lamp]
+            const lampGroup = new THREE.Group();
+            lampGroup.position.set(0, height, 0); // Base at ceiling center
+            this.roomGroup.add(lampGroup);
 
-        const lampTex = texLoader.load('textures/room_lamp.png');
-        const panelMat = new THREE.MeshBasicMaterial({
-            map: lampTex, color: 0xffaa55, transparent: true, opacity: 0.4, side: THREE.DoubleSide
-        });
-        this.introLightPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.0), panelMat);
-        this.introLightPanel.position.set(0, -0.06, 0);
-        this.introLightPanel.rotation.x = Math.PI / 2;
-        fixture.add(this.introLightPanel);
+            const blackMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7, metalness: 0.2 });
 
-        this.introLight = new THREE.PointLight(0xffaa55, 3.0, 15);
-        this.introLight.position.set(0, height - 0.5, 0);
-        this.roomGroup.add(this.introLight);
+            // 1. Ceiling Rose (Box/Cylinder)
+            const rose = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 16), blackMat);
+            rose.position.y = -0.05;
+            lampGroup.add(rose);
+
+            // 2. Chain Cord (Interlocking)
+            const chainLength = 0.6;
+            const links = 14;
+            const linkRadius = 0.02;
+            const linkTube = 0.006;
+            const linkSpacing = chainLength / links;
+            const cordMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 });
+
+            for (let i = 0; i < links; i++) {
+                const y = -0.1 - (i * linkSpacing * 0.85); // 0.85 for overlap
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(linkRadius, linkTube, 8, 16), cordMat);
+
+                if (i % 2 === 0) {
+                    ring.rotation.y = 0; // Face Z
+                } else {
+                    ring.rotation.y = Math.PI / 2; // Face X
+                }
+
+                ring.position.y = y;
+                lampGroup.add(ring);
+            }
+
+            const totalChainDrop = 0.1 + (links * linkSpacing * 0.85);
+
+            // 3. Conical Shade
+            // Wide cone, open bottom
+            const shadeGeo = new THREE.ConeGeometry(0.5, 0.3, 32, 1, true);
+            const shade = new THREE.Mesh(shadeGeo, blackMat);
+            shade.position.y = -totalChainDrop - 0.15;
+            shade.material.side = THREE.DoubleSide;
+            lampGroup.add(shade);
+
+            // 4. Black "Cap" on top of shade
+            const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.1, 0.1, 16), blackMat);
+            cap.position.y = -totalChainDrop - 0.05;
+            lampGroup.add(cap);
+
+            // 5. Light Source (Bulb inside shade)
+            this.introLight = new THREE.PointLight(0xffaa55, 2.5, 12);
+            this.introLight.position.set(0, -totalChainDrop - 0.2, 0); // Inside shade
+            lampGroup.add(this.introLight);
+
+            // Handle removed as per request.
+
+        } else {
+            // [STANDARD: Panel Light]
+            const fixture = new THREE.Mesh(
+                new THREE.BoxGeometry(0.6, 0.1, 1.2),
+                new THREE.MeshStandardMaterial({ color: 0x222222 })
+            );
+            fixture.position.set(0, height - 0.05, 0);
+            this.roomGroup.add(fixture);
+
+            const lampTex = texLoader.load('textures/room_lamp.png');
+            const panelMat = new THREE.MeshBasicMaterial({
+                map: lampTex, color: 0xffaa55, transparent: true, opacity: 0.4, side: THREE.DoubleSide
+            });
+            this.introLightPanel = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.0), panelMat);
+            this.introLightPanel.position.set(0, -0.06, 0);
+            this.introLightPanel.rotation.x = Math.PI / 2;
+            fixture.add(this.introLightPanel);
+
+            this.introLight = new THREE.PointLight(0xffaa55, 3.0, 15);
+            this.introLight.position.set(0, height - 0.5, 0);
+            this.roomGroup.add(this.introLight);
+        }
     }
 
     createDigitalClock() {

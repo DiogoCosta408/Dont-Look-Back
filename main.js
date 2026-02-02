@@ -282,7 +282,12 @@ class GameClient {
             if (this.runBackTimer > 5.0) {
                 if (!this.generator.mirage.roomGroup) {
                     this.mirageSpawnZ = pZ + 100;
-                    this.generator.createMirageRoom(this.mirageSpawnZ);
+
+                    // Count 'BACK' endings in current history
+                    const history = this.endingTracker ? this.endingTracker.history : [];
+                    const backCount = history.filter(h => h === 'BACK').length;
+
+                    this.generator.createMirageRoom(this.mirageSpawnZ, backCount);
                     // Reset timer to allow it to "settle" or prevent spam? 
                     // createMirageRoom checks if roomGroup exists, so it's safe.
                 }
