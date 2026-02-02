@@ -77,46 +77,73 @@ export class IntroRoom {
 
         // Walls
         const wallTexName = isVariant ? 'textures/checkered_floor.jpg' : 'textures/intro_room_walls.png';
-        const wallTex = texLoader.load(wallTexName);
-        wallTex.wrapS = THREE.RepeatWrapping;
-        wallTex.wrapT = THREE.RepeatWrapping;
-        wallTex.repeat.set(2, 2);
-        const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.5, color: 0xcccccc });
+        const baseWallTex = texLoader.load(wallTexName);
+        baseWallTex.wrapS = THREE.RepeatWrapping;
+        baseWallTex.wrapT = THREE.RepeatWrapping;
 
-        // Back Wall
-        const backWall = new THREE.Mesh(new THREE.PlaneGeometry(width, height), wallMat);
+        // Helper to get material with scaled repeat
+        const getWallMat = (w, h) => {
+            if (!isVariant) {
+                // Standard Behavior: Fixed (2, 2)
+                const tex = baseWallTex.clone();
+                tex.repeat.set(2, 2);
+                tex.needsUpdate = true;
+                return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, color: 0xcccccc });
+            } else {
+                // Variant Behavior: Scaled (0.5 repeats per unit)
+                const density = 0.5;
+                const tex = baseWallTex.clone();
+                tex.repeat.set(w * density, h * density);
+                tex.needsUpdate = true;
+                return new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, color: 0xcccccc });
+            }
+        };
+
+        // Back Wall (4 x 3)
+        const backMat = getWallMat(width, height);
+        const backWall = new THREE.Mesh(new THREE.PlaneGeometry(width, height), backMat);
         backWall.position.set(0, height / 2, depth / 2);
         backWall.rotation.y = Math.PI;
         this.roomGroup.add(backWall);
 
-        // Side Walls
-        const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(depth, height), wallMat);
+        // Side Walls (4 x 3)
+        const sideMat = getWallMat(depth, height);
+
+        const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(depth, height), sideMat);
         leftWall.position.set(-width / 2, height / 2, 0);
         leftWall.rotation.y = Math.PI / 2;
         this.roomGroup.add(leftWall);
 
-        const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(depth, height), wallMat);
+        const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(depth, height), sideMat);
         rightWall.position.set(width / 2, height / 2, 0);
         rightWall.rotation.y = -Math.PI / 2;
         this.roomGroup.add(rightWall);
 
         // Front Wall (Doorway)
-        const doorMat = wallMat.clone();
-        doorMat.side = THREE.DoubleSide;
-
         const dOffset = 0.6;
-        const wTopW = (width / 2) - dOffset;
+        const wTopW = (width / 2) - dOffset; // 1.4
 
-        const wLeft = new THREE.Mesh(new THREE.PlaneGeometry(wTopW, height), doorMat);
+        const leftDoorMat = getWallMat(wTopW, height);
+        leftDoorMat.side = THREE.DoubleSide; // Keep DoubleSide for door parts? Original doorMat had it.
+
+        const wLeft = new THREE.Mesh(new THREE.PlaneGeometry(wTopW, height), leftDoorMat);
         wLeft.position.set(-(dOffset + wTopW / 2), height / 2, -depth / 2);
         this.roomGroup.add(wLeft);
 
-        const wRight = new THREE.Mesh(new THREE.PlaneGeometry(wTopW, height), doorMat);
+        const rightDoorMat = getWallMat(wTopW, height);
+        rightDoorMat.side = THREE.DoubleSide;
+
+        const wRight = new THREE.Mesh(new THREE.PlaneGeometry(wTopW, height), rightDoorMat);
         wRight.position.set((dOffset + wTopW / 2), height / 2, -depth / 2);
         this.roomGroup.add(wRight);
 
-        const wHeader = new THREE.Mesh(new THREE.PlaneGeometry(dOffset * 2, height - 2.2), doorMat);
-        wHeader.position.set(0, 2.2 + (height - 2.2) / 2, -depth / 2);
+        const headerW = dOffset * 2;
+        const headerH = height - 2.2;
+        const headerMat = getWallMat(headerW, headerH);
+        headerMat.side = THREE.DoubleSide;
+
+        const wHeader = new THREE.Mesh(new THREE.PlaneGeometry(headerW, headerH), headerMat);
+        wHeader.position.set(0, 2.2 + headerH / 2, -depth / 2);
         this.roomGroup.add(wHeader);
 
         // Door Frame
