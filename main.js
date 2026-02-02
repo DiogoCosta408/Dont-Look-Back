@@ -89,6 +89,13 @@ class GameClient {
         // [ENDING TRACKER]
         this.endingTracker = new EndingTracker();
 
+        // FIX: If we load with a "True Ending" history (3 items), it means the player reloaded manualy mid-ending.
+        // We should clear it to allow a new game to start.
+        if (this.endingTracker.hasTrueEndingReached()) {
+            console.warn("MAIN: Detected stale True Ending state. Clearing history.");
+            this.endingTracker.clear();
+        }
+
         // Inject Audio into Generator (for Drown Ending)
         this.generator.setAudio(this.bgMusic);
 
@@ -517,6 +524,10 @@ class GameClient {
 
         // If 'DON'T' (Void) or 'LOOK' (Drown), we must reload now because we stopped their default reload.
         console.log("MAIN: Standard Ending - Reloading...");
+
+        // FLAG: Allow history to persist for this specific reload (Chain)
+        sessionStorage.setItem('allow_ending_persistence', 'true');
+
         setTimeout(() => window.location.reload(), 1000);
         return false;
     }

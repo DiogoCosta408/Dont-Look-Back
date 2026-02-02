@@ -68,8 +68,25 @@ export class EndingTracker {
 
     loadHistory() {
         try {
-            const data = localStorage.getItem(this.storageKey);
-            return data ? JSON.parse(data) : [];
+            // [SESSION CHECK]
+            // Only preserve history if the game explicitly requested a reload (Ending Chain).
+            // Manual Refresh should clear it.
+            const shouldPersist = sessionStorage.getItem('allow_ending_persistence');
+            console.log(`TRACKER: loadHistory called. Flag: ${shouldPersist}`);
+
+            if (shouldPersist === 'true') {
+                console.log("TRACKER: Flag consumed. LOADING history.");
+                sessionStorage.removeItem('allow_ending_persistence'); // Consume flag
+
+                const data = localStorage.getItem(this.storageKey);
+                return data ? JSON.parse(data) : [];
+            } else {
+                // Manual Refresh or First Load -> Start Fresh
+                console.log("TRACKER: No Persistence Flag. MANUAL RELOAD/RESET detected. WIPING History.");
+                localStorage.removeItem(this.storageKey);
+                return [];
+            }
+
         } catch (e) {
             console.error("EndingTracker: Failed to load history", e);
             return [];

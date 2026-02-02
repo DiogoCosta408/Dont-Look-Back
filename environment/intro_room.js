@@ -33,19 +33,22 @@ export class IntroRoom {
 
         const texLoader = new THREE.TextureLoader();
 
-        // [TEXTURE LOGIC]
-        // Standard: floor_tile.png (Intro) / floor_tile2.png (Mirage 1)
-        // Variant: checkered_floor.jpg (Walls/Floor/Ceiling)
+        // [VARIANT LOGIC]
+        // Level 0: Standard Mirage
+        // Level 1: Checkered (Back=1)
+        // Level 2: Concrete / Empty (Back>=2)
 
-        const isVariant = (isMirage && backEndingCount >= 1);
-
-        // Floor
-        let floorTexName;
-        if (isVariant) {
-            floorTexName = 'textures/checkered_floor.jpg';
-        } else {
-            floorTexName = isMirage ? 'textures/floor_tile2.png' : 'textures/floor_tile.png';
+        let variantLevel = 0;
+        if (isMirage) {
+            if (backEndingCount === 1) variantLevel = 1;
+            else if (backEndingCount >= 2) variantLevel = 2;
         }
+
+        // --- FLOOR ---
+        let floorTexName;
+        if (variantLevel === 2) floorTexName = 'textures/concrete_worn.jpg';
+        else if (variantLevel === 1) floorTexName = 'textures/checkered_floor.jpg';
+        else floorTexName = isMirage ? 'textures/floor_tile2.png' : 'textures/floor_tile.png';
 
         const floorTex = texLoader.load(floorTexName);
         floorTex.wrapS = THREE.RepeatWrapping;
@@ -57,11 +60,11 @@ export class IntroRoom {
         floor.rotation.x = -Math.PI / 2;
         this.roomGroup.add(floor);
 
-        // Ceiling
-        // Variant: Checkered. Standard: Dark Gray Color.
+        // --- CEILING ---
         let ceilingMat;
-        if (isVariant) {
-            const ceilTex = texLoader.load('textures/checkered_floor.jpg');
+        if (variantLevel >= 1) {
+            const cName = (variantLevel === 2) ? 'textures/concrete_worn.jpg' : 'textures/checkered_floor.jpg';
+            const ceilTex = texLoader.load(cName);
             ceilTex.wrapS = THREE.RepeatWrapping;
             ceilTex.wrapT = THREE.RepeatWrapping;
             ceilTex.repeat.set(2, 2);
@@ -75,15 +78,19 @@ export class IntroRoom {
         ceiling.position.y = height;
         this.roomGroup.add(ceiling);
 
-        // Walls
-        const wallTexName = isVariant ? 'textures/checkered_floor.jpg' : 'textures/intro_room_walls.png';
+        // --- WALLS ---
+        let wallTexName;
+        if (variantLevel === 2) wallTexName = 'textures/concrete_worn.jpg';
+        else if (variantLevel === 1) wallTexName = 'textures/checkered_floor.jpg';
+        else wallTexName = 'textures/intro_room_walls.png';
+
         const baseWallTex = texLoader.load(wallTexName);
         baseWallTex.wrapS = THREE.RepeatWrapping;
         baseWallTex.wrapT = THREE.RepeatWrapping;
 
         // Helper to get material with scaled repeat
         const getWallMat = (w, h) => {
-            if (!isVariant) {
+            if (variantLevel === 0) {
                 // Standard Behavior: Fixed (2, 2)
                 const tex = baseWallTex.clone();
                 tex.repeat.set(2, 2);
@@ -164,9 +171,10 @@ export class IntroRoom {
         this.roomGroup.add(headBeam);
 
         // ASSETS
-        this.createFurnishings(texLoader, dFrameTex, dFrameMat, isMirage, isVariant);
+        // FIX: Pass variantLevel. isVariant is deprecated/refactored out.
+        this.createFurnishings(texLoader, dFrameTex, dFrameMat, isMirage, variantLevel);
 
-        this.createLighting(texLoader, height, isVariant);
+        this.createLighting(texLoader, height, variantLevel);
 
         // [OUTER SHELL]
         // Disabled to debug "Ceiling/Floor" confusion
@@ -217,12 +225,56 @@ export class IntroRoom {
         // Primarily side/back/top. Front is where you enter.
     }
 
-    createFurnishings(texLoader, frameTex, frameMat, isMirage = false, isVariant = false) {
-        // Since frameEx was a typo in arg list just above, fixing:
-        // Re-load if needed or use existing.
-        // Actually I passed dFrameMat but also need dFrameTex reference maybe?
-        // Let's just re-use texLoader.
+    createFurnishings(texLoader, frameTex, frameMat, isMirage = false, variantLevel = 0) {
 
+        // VARIANT 2: Simple Wooden Chair ONLY
+        if (variantLevel === 2) {
+            const chairGroup = new THREE.Group();
+            chairGroup.position.set(-1.0, 0, 0); // Centered relative to where sofa was
+            this.roomGroup.add(chairGroup);
+
+            const woodMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
+
+            // Legs
+            const legGeo = new THREE.BoxGeometry(0.05, 0.45, 0.05);
+            const positions = [
+                [-0.2, 0.225, -0.2], [0.2, 0.225, -0.2], // Front
+                [-0.2, 0.225, 0.2], [0.2, 0.225, 0.2]    // Back
+            ];
+            positions.forEach(p => {
+                const leg = new THREE.Mesh(legGeo, woodMat);
+                leg.position.set(...p);
+                chairGroup.add(leg);
+            });
+
+            // Seat
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.5), woodMat);
+            seat.position.set(0, 0.45, 0);
+            chairGroup.add(seat);
+
+            // Backrest
+            // Two posts
+            const postGeo = new THREE.BoxGeometry(0.05, 0.5, 0.05);
+            const p1 = new THREE.Mesh(postGeo, woodMat);
+            p1.position.set(-0.2, 0.7, 0.2);
+            chairGroup.add(p1);
+            const p2 = new THREE.Mesh(postGeo, woodMat);
+            p2.position.set(0.2, 0.7, 0.2);
+            chairGroup.add(p2);
+
+            // Slats
+            const slatGeo = new THREE.BoxGeometry(0.4, 0.1, 0.02);
+            const s1 = new THREE.Mesh(slatGeo, woodMat);
+            s1.position.set(0, 0.65, 0.2);
+            chairGroup.add(s1);
+            const s2 = new THREE.Mesh(slatGeo, woodMat);
+            s2.position.set(0, 0.85, 0.2);
+            chairGroup.add(s2);
+
+            return; // EXIT early, no sofa/table
+        }
+
+        // VARIANT 0/1: Sofa & Table
         const sofaTex = texLoader.load('textures/sofa_texture.png');
         const sofaMat = new THREE.MeshStandardMaterial({ map: sofaTex, color: 0x888888, roughness: 0.8 });
 
@@ -318,11 +370,9 @@ export class IntroRoom {
 
         // Canvas
         let portraitTex;
-        if (isVariant) {
-            portraitTex = 'textures/mirage_2.jpg';
-        } else {
-            portraitTex = isMirage ? 'textures/nottobereproduced.jpg' : 'textures/fractal.png';
-        }
+        if (variantLevel === 2) portraitTex = 'textures/mirage_3.jpg';
+        else if (variantLevel === 1) portraitTex = 'textures/mirage_2.jpg';
+        else portraitTex = isMirage ? 'textures/nottobereproduced.jpg' : 'textures/fractal.png';
 
         const portrait = new THREE.Mesh(
             new THREE.PlaneGeometry(1.5, 2.0),
@@ -334,7 +384,7 @@ export class IntroRoom {
         this.interactables.push(portrait);
 
         // --- CLOCK ---
-        this.createDigitalClock();
+        this.createClock(variantLevel);
         this.clockMesh.position.set(0, 2.2, 2.0 - 0.1);
         this.clockMesh.rotation.y = Math.PI;
         this.roomGroup.add(this.clockMesh);
@@ -388,8 +438,8 @@ export class IntroRoom {
         this.roomGroup.add(lampGroup);
     }
 
-    createLighting(texLoader, height, isVariant = false) {
-        if (isVariant) {
+    createLighting(texLoader, height, variantLevel = 0) {
+        if (variantLevel >= 1) {
             // [VARIANT: Conical Spring Lamp]
             const lampGroup = new THREE.Group();
             lampGroup.position.set(0, height, 0); // Base at ceiling center
@@ -470,7 +520,60 @@ export class IntroRoom {
         }
     }
 
-    createDigitalClock() {
+    createClock(variantLevel = 0) {
+        this.clockVariant = variantLevel;
+
+        // VARIANT 2: Analog Clock (Ancient)
+        if (this.clockVariant === 2) {
+            const clockGroup = new THREE.Group();
+
+            // Frame/Body
+            // Round worn casing
+            const caseGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.05, 32);
+            const caseMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.8 }); // Old wood/copper?
+            const casing = new THREE.Mesh(caseGeo, caseMat);
+            casing.rotation.x = Math.PI / 2;
+            clockGroup.add(casing);
+
+            // Face
+            const faceGeo = new THREE.CircleGeometry(0.35, 32);
+            const faceMat = new THREE.MeshStandardMaterial({ color: 0xddddcc, roughness: 0.9 }); // Yellowed paper
+            const face = new THREE.Mesh(faceGeo, faceMat);
+            face.position.z = 0.03;
+            clockGroup.add(face);
+
+            // Hands container
+            this.analogHands = new THREE.Group();
+            this.analogHands.position.z = 0.04;
+            clockGroup.add(this.analogHands);
+
+            // Minute Hand (Longer)
+            const mHand = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.28, 0.01), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+            mHand.position.y = 0.14;
+            this.minuteHandContainer = new THREE.Group();
+            this.minuteHandContainer.add(mHand);
+            this.analogHands.add(this.minuteHandContainer);
+
+            // Second Hand (Think red)
+            const sHand = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.32, 0.01), new THREE.MeshBasicMaterial({ color: 0xaa0000 }));
+            sHand.position.y = 0.1; // Extends back a bit? No just centered.
+            sHand.position.y = 0.16;
+            this.secondHandContainer = new THREE.Group();
+            this.secondHandContainer.add(sHand);
+            this.analogHands.add(this.secondHandContainer);
+
+            // Central Pin
+            const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.02, 16), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            pin.rotation.x = Math.PI / 2;
+            pin.position.z = 0.05;
+            clockGroup.add(pin);
+
+            this.clockMesh = clockGroup;
+            this.updateClockTime();
+            return;
+        }
+
+        // VARIANT 0/1: Digital Clock
         this.clockCanvas = document.createElement('canvas');
         this.clockCanvas.width = 256;
         this.clockCanvas.height = 128;
@@ -483,9 +586,12 @@ export class IntroRoom {
         );
         display.position.z = 0.06;
 
+        let frameColor = 0x111111;
+        if (this.clockVariant === 1) frameColor = 0x5c4033; // Vintage Wood/Plastic Brown
+
         const frame = new THREE.Mesh(
             new THREE.BoxGeometry(0.9, 0.5, 0.1),
-            new THREE.MeshStandardMaterial({ color: 0x111111 })
+            new THREE.MeshStandardMaterial({ color: frameColor })
         );
 
         this.clockMesh = new THREE.Group();
@@ -502,27 +608,57 @@ export class IntroRoom {
     }
 
     updateClockTime() {
+        const now = Date.now();
+        let totalSeconds = 0;
+
+        if (this.clockRunning) {
+            const start = this.clockStartTime;
+            const elapsed = now - start;
+            totalSeconds = Math.floor(elapsed / 1000);
+        }
+
+        if (this.clockVariant === 2) {
+            // Analog Update
+            if (this.minuteHandContainer && this.secondHandContainer) {
+                const sec = totalSeconds % 60;
+                const min = Math.floor(totalSeconds / 60) % 60;
+
+                // -2PI * (sec / 60)
+                this.secondHandContainer.rotation.z = - (sec / 60) * Math.PI * 2;
+                this.minuteHandContainer.rotation.z = - (min / 60) * Math.PI * 2;
+                // Note: Smooth movement for seconds? 'elapsed' has ms.
+                // If precise 'tick' needed: use floor logic.
+                // Analog clocks usually sweep or tick. Let's stick to floor for ticks.
+            }
+            return;
+        }
+
+        // Digital Update
         if (!this.clockCtx) return;
         const ctx = this.clockCtx;
 
         ctx.fillStyle = '#000000';
         ctx.fillRect(0, 0, 256, 128); // Background
 
-        let timeStr = "00:00";
+        const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+        const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+        const timeStr = `${minutes}:${seconds}`;
 
-        if (this.clockRunning) {
-            const now = Date.now();
-            const start = this.clockStartTime;
-            const elapsed = now - start;
-
-            const totalSeconds = Math.floor(elapsed / 1000);
-            const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-            const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-            timeStr = `${minutes}:${seconds}`;
+        if (this.clockVariant === 1) {
+            // Vintage 80s Style
+            ctx.fillStyle = '#00ff00'; // Green phosphor
+            // Or 'Amber' #ffb000
+            // User requested "Vintage like 80s": Often Red or Green.
+            // Let's go with Green to contrast the Red standard.
+            ctx.font = 'bold 80px "Courier New", monospace';
+            // Scanlines?
+            ctx.fillStyle = '#55ff55';
+        } else {
+            // Modern Red
+            ctx.fillStyle = '#ff0000';
+            ctx.font = 'bold 80px monospace';
         }
 
-        ctx.fillStyle = '#ff0000'; // Red LED
-        ctx.font = 'bold 80px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(timeStr, 128, 64);
