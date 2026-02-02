@@ -557,6 +557,8 @@ export class FacilitySystem {
         if (this.endgameTriggered) return; // No messages in space
         if (this.environment.drownManager && this.environment.drownManager.active) return;
 
+        const p = this.player.metrics;
+
         // RESET APATHY LEVEL IF MOVING
         if (this.player.metrics.stationaryTime < 1.0) {
             this.apathyLevel = 0;
@@ -623,8 +625,14 @@ export class FacilitySystem {
         }
 
         // MESSAGING SYSTEM (4 Types)
-        // 1. SYSTEM LOGS (Bottom Left, Green/Console style)
-        // 2. VOICES (Top Center, Ghostly)
+
+        // [LOGIC: First Message "DON'T LOOK BACK"]
+        if (!this.hasTriggeredFirstMessage && p.isLookingBack) {
+            // Override everything for the very first look-back experience
+            this.hasTriggeredFirstMessage = true;
+            this.triggerMessage(time, 'first_look_back_override', pFactor);
+            return;
+        }
 
         // GATING: If Apathy Event just happened, block regular messages for 10 seconds
         if (this.lastApathyEventTime && (time - this.lastApathyEventTime < 10.0)) return;
@@ -639,21 +647,21 @@ export class FacilitySystem {
             currentCooldown = 13.0;
         }
 
+        // [LOGIC: Cooldown Halved when Looking Back & Walking Back]
+        if (p.isLookingBack && !p.isStationary) {
+            currentCooldown *= 0.5;
+        }
+
         if (time - this.lastMessageTime < currentCooldown) return;
 
-        const p = this.player.metrics;
         let selectedPool = null;
 
         // Force selection in Apathy Mode if cooldown met
         if (this.player.metrics.stationaryTime > 5.0 && this.paranoiaLevel < 20) {
             // Prioritize "Instinctive Doubt" or "Stationary"
-            // User: "regular yellow messages"
             // Let's pick from stationary or instinctiveDoubt
             if (Math.random() < 0.5) selectedPool = 'stationary';
             else selectedPool = 'instinctiveDoubt';
-        } else {
-            // Normal Logic (Random Chance)
-            // ...
         }
 
         // High Paranoia Overlay
@@ -729,36 +737,43 @@ export class FacilitySystem {
     triggerMessage(time, poolName, pFactor = 0) {
         this.lastMessageTime = time;
 
-        // Chance of contradiction scales with paranoia
-        if (Math.random() < (0.01 + pFactor * 0.2)) {
-            poolName = "contradiction";
-        }
+        let msg = "";
 
-        const pool = this.messagePools[poolName];
-        if (pool) {
-            let msg = "";
-            let uniqueFound = false;
+        // Handle Override
+        if (poolName === 'first_look_back_override') {
+            msg = "DON'T LOOK BACK";
+        } else {
+            // Chance of contradiction scales with paranoia (only if not overriding)
+            if (Math.random() < (0.01 + pFactor * 0.2)) {
+                poolName = "contradiction";
+            }
 
-            // Try 3 times to find a unique message
-            for (let i = 0; i < 3; i++) {
-                msg = pool[Math.floor(Math.random() * pool.length)];
-                if (!this.recentMessages.includes(msg)) {
-                    uniqueFound = true;
-                    break;
+            const pool = this.messagePools[poolName];
+            if (pool) {
+                let uniqueFound = false;
+                // Try 3 times to find a unique message
+                for (let i = 0; i < 3; i++) {
+                    msg = pool[Math.floor(Math.random() * pool.length)];
+                    if (!this.recentMessages.includes(msg)) {
+                        uniqueFound = true;
+                        break;
+                    }
                 }
+                if (!uniqueFound && pool.length > 0) msg = pool[0];
             }
-
-            // If failed to find unique, use last picked (msg)
-
-            // Update Queue
-            this.recentMessages.push(msg);
-            if (this.recentMessages.length > 5) {
-                this.recentMessages.shift();
-            }
-
-            this.logMessage(msg, pFactor);
         }
+
+        if (!msg) return;
+
+        // Update Queue
+        this.recentMessages.push(msg);
+        if (this.recentMessages.length > 5) {
+            this.recentMessages.shift();
+        }
+
+        this.logMessage(msg, pFactor);
     }
+
 
     playBell() {
         if (!this.bellAudio) {
@@ -796,6 +811,33 @@ export class FacilitySystem {
 
         // Urgency styling
         entry.style.fontWeight = (pFactor > 0.5) ? 'bold' : '300';
+
+        // [TREMBLE EFFECT]
+        // Scale intensity with pFactor
+        if (pFactor > 0.1) {
+            entry.style.display = 'inline-block';
+            entry.style.position = 'relative';
+
+            const intensity = pFactor * 5.0; // Max 5px shuffle
+
+            const trembleId = setInterval(() => {
+                const dx = (Math.random() - 0.5) * intensity;
+                const dy = (Math.random() - 0.5) * intensity;
+                entry.style.transform = `translate(${dx}px, ${dy}px)`;
+
+                // Opacity flicker for high paranoia
+                if (pFactor > 0.6 && Math.random() < 0.2) {
+                    entry.style.opacity = Math.random();
+                } else {
+                    entry.style.opacity = 1.0;
+                }
+
+                // Cleanup if removed (simplified check, optimized for modern browsers)
+                if (!entry.isConnected) clearInterval(trembleId);
+            }, 50);
+        }
+
+
 
         if (styleOverride) {
             // Apply custom styles

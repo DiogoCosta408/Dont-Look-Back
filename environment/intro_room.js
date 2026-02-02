@@ -399,44 +399,41 @@ export class IntroRoom {
         this.roomGroup.add(carpet);
 
         // --- LAMP (Right of Table) ---
-        const lBlack = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
+        // VARIANT 3 (Level 2): Ceiling Lamp ONLY. No table lamp.
+        if (variantLevel < 2) {
+            const lBlack = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
+            const lampGroup = new THREE.Group();
+            lampGroup.position.set(-1.6, 0.0, -1.4);
 
-        const lampGroup = new THREE.Group();
-        lampGroup.position.set(-1.6, 0.0, -1.4);
+            // 1. Stem
+            const lStem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.4), lBlack);
+            lStem.position.y = 0.7;
+            lampGroup.add(lStem);
 
-        // 1. Stem
-        const lStem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.4), lBlack);
-        lStem.position.y = 0.7;
-        lampGroup.add(lStem);
+            // 2. Shade (Re-elevated, connected by bar)
+            // Previous Floating height: 1.65
+            const lShade = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.12, 0.25, 32, 1, true), lBlack);
+            lShade.position.set(0.3, 1.65, 0); // Back to offset
+            lShade.rotation.z = Math.PI / 10;
+            lShade.material.side = THREE.DoubleSide;
+            lampGroup.add(lShade);
 
-        // 2. Shade (Re-elevated, connected by bar)
-        // Previous Floating height: 1.65
-        const lShade = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.12, 0.25, 32, 1, true), lBlack);
-        lShade.position.set(0.3, 1.65, 0); // Back to offset
-        lShade.rotation.z = Math.PI / 10;
-        lShade.material.side = THREE.DoubleSide;
-        lampGroup.add(lShade);
+            // 3. Diagonal Bar Connector
+            // Connects Top of Stem (0, 1.4, 0) to Shade Center (0.3, 1.65, 0)
+            const connector = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4), lBlack);
+            connector.position.set(0.15, 1.52, 0);
+            connector.rotation.z = -0.85; // Roughly connects them
+            lampGroup.add(connector);
 
-        // 3. Diagonal Bar Connector
-        // Connects Top of Stem (0, 1.4, 0) to Shade Center (0.3, 1.65, 0)
-        // dx = 0.3, dy = 0.25.
-        // Length = sqrt(0.3^2 + 0.25^2) = 0.39
-        // Midpoint = (0.15, 1.525, 0)
-        // Angle = atan2(0.3, 0.25) -> Rotation Z.
-        // Actually, just visual approximation:
-        const connector = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4), lBlack);
-        connector.position.set(0.15, 1.52, 0);
-        connector.rotation.z = -0.85; // Roughly connects them
-        lampGroup.add(connector);
+            // Spot
+            const lSpot = new THREE.SpotLight(0xffaa00, 5.0, 5.0, Math.PI / 4, 0.5, 1);
+            lSpot.position.set(0.3, 1.63, 0);
+            lSpot.target.position.set(0.2, 0, 0);
+            lampGroup.add(lSpot);
+            lampGroup.add(lSpot.target);
 
-        // Spot
-        const lSpot = new THREE.SpotLight(0xffaa00, 5.0, 5.0, Math.PI / 4, 0.5, 1);
-        lSpot.position.set(0.3, 1.63, 0);
-        lSpot.target.position.set(0.2, 0, 0);
-        lampGroup.add(lSpot);
-        lampGroup.add(lSpot.target);
-
-        this.roomGroup.add(lampGroup);
+            this.roomGroup.add(lampGroup);
+        }
     }
 
     createLighting(texLoader, height, variantLevel = 0) {
@@ -536,11 +533,14 @@ export class IntroRoom {
             casing.rotation.x = Math.PI / 2;
             clockGroup.add(casing);
 
-            // Face
+            // Face (Textured)
             const faceGeo = new THREE.CircleGeometry(0.35, 32);
-            const faceMat = new THREE.MeshStandardMaterial({ color: 0xddddcc, roughness: 0.9 }); // Yellowed paper
+            const clockTex = new THREE.TextureLoader().load('textures/clock_face_analog.jpg');
+            // Rotate texture if needed, or rotate mesh. The image is likely upright.
+            const faceMat = new THREE.MeshBasicMaterial({ map: clockTex });
             const face = new THREE.Mesh(faceGeo, faceMat);
-            face.position.z = 0.03;
+            face.position.z = 0.031; // Slightly above casing
+            // face.rotation.z = -Math.PI / 2; // Adjust if texture is rotated
             clockGroup.add(face);
 
             // Hands container
