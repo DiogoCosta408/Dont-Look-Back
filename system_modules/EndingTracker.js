@@ -19,7 +19,7 @@ export class EndingTracker {
             },
             'BACK_BACK_BACK': {
                 text: "\"Remorse is the poison of life.\"",
-                author: "Katherine Mansfield"
+                author: "Charlotte Brontë"
             },
 
             // 2x DON'T Combinations
