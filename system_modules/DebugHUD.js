@@ -200,6 +200,8 @@ export class DebugHUD {
                 + (mult > 1 ? (mult >= 2.99 ? '  MAX' : '  ramping') : ''));
             L.push('lookBackT   ' + (sys.lookBackTimer || 0).toFixed(1) + 's'
                 + '   apathy ' + (sys.apathyLevel || 0));
+            L.push('stillBack   ' + (sys.stillLookBackTimer || 0).toFixed(1) + 's / 180'
+                + (sys.jumpscareFired ? '  [FIRED]' : ''));
             L.push('voidDist    ' + (sys.highParanoiaDistance || 0).toFixed(0)
                 + (sys.endgameTriggered ? '   [ENDGAME]' : ''));
         }

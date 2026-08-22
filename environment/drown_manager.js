@@ -23,22 +23,111 @@ export class DrownManager {
     }
 
     createWater() {
-        // ... (unchanged)
-        const textureLoader = new THREE.TextureLoader();
-        const waterTexture = textureLoader.load('textures/water.jpg');
-        waterTexture.wrapS = THREE.RepeatWrapping;
-        waterTexture.wrapT = THREE.RepeatWrapping;
-        waterTexture.repeat.set(20, 20);
+        // [WATER SURFACE]
+        // Was a single flat quad with water.jpg tiled 20x. Two problems: the photo
+        // is 6747x4460 and does not tile, and because the plane is centred on the
+        // camera an even repeat count put a tile boundary exactly underneath the
+        // player - the seam splitting the ocean down the middle of the screen.
+        // A flat quad also cannot move, so the surface read as painted-on.
+        //
+        // It is now a subdivided plane displaced by summed sine waves in the vertex
+        // shader, and shaded from that wave height rather than from a texture. No
+        // texture means no seam and no tiling to hide, and the swell gives it motion.
+        //
+        // Size: drown fog is FogExp2 at 0.05, which is effectively opaque past ~40
+        // units, so a 400-unit plane is far larger than anything that can be seen and
+        // 200 segments still puts a vertex every 2 units where it matters.
+        const geo = new THREE.PlaneGeometry(400, 400, 200, 200);
 
-        // Large plane for infinite water
-        const geo = new THREE.PlaneGeometry(2000, 2000);
         const mat = new THREE.MeshBasicMaterial({
-            color: 0x051022,
-            map: waterTexture,
-            transparent: false,
-            opacity: 1.0,
+            color: 0xffffff, // colour comes from the shader below
             side: THREE.DoubleSide
         });
+
+        this.waterUniforms = {
+            uTime: { value: 0 },
+            // Wave terms sum to ~1.34, so this is the peak-to-trough scale in world
+            // units. Kept low deliberately: a dead-calm sheet with a slow swell.
+            uAmp: { value: 0.25 }
+        };
+
+        mat.onBeforeCompile = (shader) => {
+            shader.uniforms.uTime = this.waterUniforms.uTime;
+            shader.uniforms.uAmp = this.waterUniforms.uAmp;
+
+            shader.vertexShader = `
+                uniform float uTime;
+                uniform float uAmp;
+                varying float vWaveH;
+                varying vec2 vSurf;
+
+                // Plane is authored in XY and rotated -90deg about X, so local XY are
+                // the horizontal axes and local Z becomes world up.
+                //
+                // Every wave travels along its own oblique direction. Axis-aligned
+                // components (sin(x), sin(y)) line their crests up with the grid and
+                // read as a lattice rather than as water.
+                // Weighted toward long, slow swell: the low-frequency terms carry
+                // nearly all the amplitude and the short ones are barely present, so
+                // the surface breathes rather than chops. Overall scale is uAmp.
+                float waveHeight(vec2 p, float t) {
+                    float h = 0.0;
+                    h += sin(dot(p, vec2( 0.98,  0.17)) * 0.055 + t * 0.28) * 0.55;
+                    h += sin(dot(p, vec2(-0.28,  0.96)) * 0.042 - t * 0.22) * 0.48;
+                    h += sin(dot(p, vec2( 0.71,  0.70)) * 0.090 + t * 0.35) * 0.20;
+                    h += sin(dot(p, vec2( 0.60, -0.80)) * 0.150 - t * 0.45) * 0.075;
+                    h += sin(dot(p, vec2(-0.87, -0.49)) * 0.240 + t * 0.60) * 0.035;
+                    return h;
+                }
+            ` + shader.vertexShader;
+
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <begin_vertex>',
+                `#include <begin_vertex>
+                 vSurf = transformed.xy;
+                 vWaveH = waveHeight(transformed.xy, uTime);
+                 transformed.z += vWaveH * uAmp;`
+            );
+
+            shader.fragmentShader = `
+                uniform float uTime;
+                varying float vWaveH;
+                varying vec2 vSurf;
+            ` + shader.fragmentShader;
+
+            // No map on this material, so map_fragment resolves to nothing - we use
+            // its slot to author the surface colour directly.
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <map_fragment>',
+                `// Near-black navy. The scene is lit only by a distant pyramid, so the
+                 // surface should sit barely above the fog rather than glow.
+                 vec3 deepCol  = vec3(0.0030, 0.0080, 0.0190);
+                 vec3 crestCol = vec3(0.0110, 0.0250, 0.0480);
+
+                 // Biased low: vWaveH is the raw wave sum (~ -1.34..1.34), and mapping
+                 // the midpoint well below halfway keeps most of the sheet at deepCol
+                 // with only the true crests lifting toward crestCol.
+                 float crest = smoothstep(-0.5, 1.25, vWaveH);
+                 vec3 surf = mix(deepCol, crestCol, crest);
+
+                 // Fine detail between vertices. Summed oblique waves, never a product
+                 // of sin(x) and sin(y) - that separates into an exact checkerboard.
+                 float chop = sin(dot(vSurf, vec2( 0.87,  0.49)) * 0.85 + uTime * 0.75)
+                            + sin(dot(vSurf, vec2(-0.42,  0.91)) * 1.30 - uTime * 0.55)
+                            + sin(dot(vSurf, vec2( 0.63, -0.78)) * 1.90 + uTime * 0.95);
+                 surf += chop * 0.0016;
+
+                 // A faint lift on the highest crests - the only light left out here.
+                 surf += smoothstep(1.05, 1.32, vWaveH) * 0.012;
+
+                 diffuseColor.rgb *= surf;`
+            );
+        };
+
+        // onBeforeCompile is not part of the program cache key, so give this material
+        // its own key - otherwise it could share a compiled program with an ordinary
+        // unlit material and silently lose the wave code.
+        mat.customProgramCacheKey = () => 'drown-water-v1';
 
         this.waterMesh = new THREE.Mesh(geo, mat);
         this.waterMesh.rotation.x = -Math.PI / 2;
@@ -146,6 +235,9 @@ export class DrownManager {
 
         // 1. Water Rising
         this.waterMesh.position.y += this.waterRiseSpeed * delta;
+
+        // Drive the swell
+        if (this.waterUniforms) this.waterUniforms.uTime.value += delta;
 
         // 2. Walls Descending (Immediate)
         // Access chunks via corridor generator

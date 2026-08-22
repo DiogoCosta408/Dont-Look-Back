@@ -24,6 +24,17 @@ const FLICKER_CHAIN_MAX = 0.7;
 // Facing counts as forward while the camera's forward Z is below the threshold,
 // i.e. within ~60 degrees of straight ahead - deliberately stricter than merely
 // "not looking back", so you have to actually settle rather than stand sideways.
+// [SLEEP PARALYSIS]
+// Hold perfectly still while facing backwards for this long and the thing you keep
+// checking for finally arrives, and the run ends. Nothing else in the game rewards
+// standing and staring behind you - looking back pins paranoia at max, which locks
+// out the apathy/Drown path - so this is a dead end a player only reaches on purpose.
+//
+// It is NOT an ending: it records no keyword and leaves the ending history exactly
+// as it found it, so it can neither advance nor damage the True Ending chain.
+const JUMPSCARE_STILL_LOOKBACK = 180.0;
+const JUMPSCARE_HOLD_MS = 1400;
+
 const CALM_FACING_THRESHOLD = -0.5;
 const CALM_RAMP_DELAY = 20.0;
 const CALM_RAMP_RAMP = 15.0;   // reaches full speed at 35s of holding still
@@ -65,6 +76,10 @@ export class FacilitySystem {
         // speed-up it has earned. See the CALM_* constants.
         this.calmTimer = 0;
         this.calmMultiplier = 1.0;
+
+        // Uninterrupted seconds spent still AND facing backwards. Fires once per run.
+        this.stillLookBackTimer = 0;
+        this.jumpscareFired = false;
 
         // Timer Logic
         this.survivalTime = 0;
@@ -292,6 +307,50 @@ export class FacilitySystem {
         }
     }
 
+    // The sleep-paralysis figure. The overlay and image already existed in
+    // index.html (#jumpscare-overlay), pre-styled to slam from scale(0.1) to full
+    // over 0.2s - nothing in the codebase had ever shown it.
+    triggerJumpscare() {
+        const overlay = document.getElementById('jumpscare-overlay');
+        const img = document.getElementById('jumpscare-img');
+        if (!overlay || !img) return;
+
+        console.log("SYS: SLEEP PARALYSIS");
+
+        overlay.style.display = 'flex';
+        img.style.transform = 'scale(0.1)';
+
+        // Force a reflow. Without it the browser coalesces both transform writes into
+        // a single style update and the image just appears at full size, no slam.
+        void img.offsetWidth;
+        img.style.transform = 'scale(1)';
+
+        if (this.audio && this.audio.playSpook) this.audio.playSpook();
+
+        // Nothing left to do but look at it.
+        if (this.player.setMobilized) this.player.setMobilized(false);
+        if (this.player.setViewLocked) this.player.setViewLocked(true);
+
+        clearTimeout(this._jumpscareTimeout);
+        this._jumpscareTimeout = setTimeout(() => {
+            // Reset the run without recording an ending.
+            //
+            // The reload MUST carry the persistence flag. EndingTracker.loadHistory
+            // wipes localStorage on any reload that arrives without it - that is how
+            // a manual F5 is told apart from an ending chain. Reloading bare here
+            // would delete the player's progress toward the True Ending, which is
+            // worse than not contributing: it would actively undo. With the flag set
+            // and no addEnding() call, the history survives exactly as it was.
+            try {
+                sessionStorage.setItem('allow_ending_persistence', 'true');
+            } catch (e) {
+                console.warn("SYS: could not preserve ending history across jumpscare reset", e);
+            }
+
+            window.dispatchEvent(new CustomEvent('reset-simulation'));
+        }, JUMPSCARE_HOLD_MS);
+    }
+
     getParanoiaFactor() {
         return this.paranoiaLevel / this.maxParanoia;
     }
@@ -351,6 +410,19 @@ export class FacilitySystem {
         if (p.turnAroundTrigger) {
             this.paranoiaLevel += 15.0; // User Request: +15
             console.log("SYS: Look Back Return Spike (+15)");
+        }
+
+        // [SLEEP PARALYSIS WATCH]
+        // Only counts while BOTH still and facing back; either one breaking resets it.
+        if (p.isLookingBack && p.isStationary) {
+            this.stillLookBackTimer += delta;
+
+            if (this.stillLookBackTimer >= JUMPSCARE_STILL_LOOKBACK && !this.jumpscareFired) {
+                this.jumpscareFired = true;
+                this.triggerJumpscare();
+            }
+        } else {
+            this.stillLookBackTimer = 0;
         }
 
         // Continuous Gain (While Z > 0)
@@ -969,6 +1041,7 @@ export class FacilitySystem {
         this.blackoutCooldown = 0;
         this.calmTimer = 0;
         this.calmMultiplier = 1.0;
+        this.stillLookBackTimer = 0;
         this.environment.forceBlackout = false;
 
         if (this._currentWhisper) {
