@@ -1,3 +1,19 @@
+// [LIGHT EVENT TUNING]
+// Rates are per second and multiplied by delta at the call site, so they mean the
+// same thing at 60fps and 144fps.
+
+// Full blackout: a rare punctuation mark, not a recurring effect. Only rolls above
+// 95% paranoia, and then averages once every ~150s of sustained max paranoia, with
+// a hard cooldown afterwards so two can never land close together.
+const BLACKOUT_RATE_PER_SEC = 1 / 150;
+const BLACKOUT_COOLDOWN = 90;
+
+// Flicker: the ambient version of the same idea. Silent below moderate-high
+// paranoia, then ramps from an occasional stutter to a steady crackle at max.
+const FLICKER_MIN_PARANOIA = 0.55;
+const FLICKER_RATE_MIN = 0.15; // ~1 per 7s at the threshold
+const FLICKER_RATE_MAX = 1.5;  // matches the old peak rate at max paranoia
+
 export class FacilitySystem {
     constructor(player, environment, uiElements) {
         this.player = player;
@@ -27,6 +43,8 @@ export class FacilitySystem {
             timer: 0,
             duration: 5.0
         };
+        // Seconds still to wait before another blackout may be rolled.
+        this.blackoutCooldown = 0;
 
         // Timer Logic
         this.survivalTime = 0;
@@ -434,6 +452,10 @@ export class FacilitySystem {
         if (this.endgameTriggered) return; // NO EVENTS IN SPACE (Peace/Void)
         if (this.environment.drownManager && this.environment.drownManager.active) return; // NO EVENTS DURING DROWNING
 
+        // Tick the blackout cooldown before the calm early-out, so it measures real
+        // elapsed time rather than only time spent at high paranoia.
+        if (this.blackoutCooldown > 0) this.blackoutCooldown -= delta;
+
         if (pFactor < 0.1) return; // Too calm
 
         // Check for state-driven whispers
@@ -467,21 +489,30 @@ export class FacilitySystem {
                 this.environment.forceBlackout = false;
                 if (this.environment.hideMirage) this.environment.hideMirage();
             }
+            this.blackoutCooldown = BLACKOUT_COOLDOWN;
             return; // Skip other events during blackout
         } else if (pFactor > 0.95) {
-            // ... blackout trigger ...
-            // Reduced Rate (User Request: Half rate)
-            if (Math.random() < 0.00025) {
+            // [BLACKOUT TRIGGER]
+            // Rates below are PER SECOND and scaled by delta. The old code rolled a
+            // fixed per-frame chance, so the event fired 2.4x more often at 144fps
+            // than at 60 - impossible to tune "rare" against.
+            if (this.blackoutCooldown <= 0 && Math.random() < BLACKOUT_RATE_PER_SEC * delta) {
                 this.blackout.active = true;
                 this.blackout.timer = 0;
             }
         }
 
         // 2. LIGHT FLICKERING
-        // Reduced Rate (User Request: Half rate)
-        const flickerChance = (0.0005 + (pFactor * 0.05)) * 0.5;
-        if (Math.random() < flickerChance) {
-            if (this.environment.flickerLights) this.environment.flickerLights();
+        // Only from moderate-high paranoia upward, ramping to full rate at max.
+        // Below the threshold the corridor stays steady, so a flicker actually reads
+        // as the facility reacting to the player rather than as constant noise.
+        if (pFactor >= FLICKER_MIN_PARANOIA) {
+            const ramp = (pFactor - FLICKER_MIN_PARANOIA) / (1 - FLICKER_MIN_PARANOIA);
+            const flickerRate = FLICKER_RATE_MIN + ramp * (FLICKER_RATE_MAX - FLICKER_RATE_MIN);
+
+            if (Math.random() < flickerRate * delta) {
+                if (this.environment.flickerLights) this.environment.flickerLights();
+            }
         }
 
         // 3. CAMERA INVERSION (High Paranoia)
@@ -891,6 +922,7 @@ export class FacilitySystem {
         // Reset Effects
         this.blackout.active = false;
         this.blackout.timer = 0;
+        this.blackoutCooldown = 0;
         this.environment.forceBlackout = false;
 
         if (this._currentWhisper) {

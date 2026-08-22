@@ -161,7 +161,7 @@ export class DrownManager {
                     child.position.y += 0.264 * delta;
                     child.position.x += 0.664 * delta;
                     child.rotation.z -= 0.0132 * delta;
-                } else if (child.name === "wall" || child.name === "pillar" || child.name === "light_fixture" || child.name === "light_source") {
+                } else if (child.name === "wall" || child.name === "pillar") {
                     child.position.y -= this.wallDescendSpeed * delta;
                 }
                 // Floor Sinking (Delayed)
@@ -173,7 +173,11 @@ export class DrownManager {
             });
         });
 
-
+        // Lamps are pooled on the scene rather than parented to the chunks, so they
+        // are no longer reachable by child name above - sink them explicitly.
+        if (this.lighting && this.lighting.descend) {
+            this.lighting.descend(this.wallDescendSpeed * delta);
+        }
 
         // 3. Screen Shake (Crumbling Columns)
         if (this.shakeActive) {

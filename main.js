@@ -7,6 +7,7 @@ import { FacilityGenerator } from './environment.js';
 import { FacilitySystem } from './facility_system.js';
 import { AudioSystem } from './audio_system.js';
 import { EndingTracker } from './system_modules/EndingTracker.js';
+import { PerfMonitor } from './system_modules/PerfMonitor.js';
 
 console.log("FACILITY_OS: CORE SYSTEM INITIALIZED");
 
@@ -137,6 +138,9 @@ class GameClient {
 
         // CRITICAL: Add Controls to Scene to ensure World Matrix updates correctly
         this.scene.add(this.player.controls.getObject());
+
+        // Frame-time / shader-recompile instrumentation (F3 to show)
+        this.perf = new PerfMonitor();
 
         this.startIntro();
         this.animate();
@@ -406,8 +410,9 @@ class GameClient {
                     this.checkConsecutiveEndings();
 
                     // 4. Generate World Behind Door
-                    this.generator.corridor.chunks.forEach(c => this.scene.remove(c));
-                    this.generator.corridor.chunks = [];
+                    // clearAll (not a raw scene.remove loop) so pooled lamps go back
+                    // to the pool instead of being left lit in empty space.
+                    this.generator.corridor.clearAll();
                     this.generator.corridor.zOffset = 0;
                     this.generator.corridor.interactables = [];
 
@@ -447,7 +452,10 @@ class GameClient {
 
         // --- GAME LOOP ---
         // Global updates (Logic handled by Facade/System internally)
+        const chunksBefore = this.generator.corridor.chunks.length;
+        const genStart = performance.now();
         this.generator.update(this.player.controls.getObject().position.z, delta);
+        if (this.perf) this.perf.noteGeneration(performance.now() - genStart, chunksBefore);
 
         // Single Audio Update
         if (!this.generator.drownManager || !this.generator.drownManager.active) {
@@ -519,6 +527,8 @@ class GameClient {
 
         // this.renderer.render(this.scene, this.camera);
         this.composer.render();
+
+        if (this.perf) this.perf.endFrame(this.renderer, this.generator);
     }
 
 

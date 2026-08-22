@@ -20,11 +20,30 @@ export class CorridorGenerator {
             pillarOffset: 0
         };
 
+        this.corridorWidth = 6;
+
         this.materials = {
             floor: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.3 }),
             wall: new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8 }),
             ceiling: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 })
         };
+
+        // [SHARED GEOMETRY]
+        // Built once and reused by every chunk. Previously each chunk allocated its
+        // own floor, ceiling, wall and pillar geometry, so every spawn pushed fresh
+        // buffers to the GPU and left the old ones undisposed. Chunk height drifts,
+        // so the two height-dependent shapes are unit-height and scaled per mesh -
+        // scaling costs nothing and keeps a single buffer on the GPU.
+        this.geometries = {
+            floor: new THREE.PlaneGeometry(this.corridorWidth, this.chunkSize),
+            ceilingHalf: new THREE.PlaneGeometry(this.corridorWidth / 2, this.chunkSize),
+            wall: new THREE.BoxGeometry(1, 1, this.chunkSize),
+            pillar: new THREE.BoxGeometry(1.5, 1, 2)
+        };
+
+        // Scratch vectors so lamp placement does not allocate per pillar.
+        this._lampLightPos = new THREE.Vector3();
+        this._lampMeshPos = new THREE.Vector3();
     }
 
     setDriftIntensity(intensity) {
@@ -64,25 +83,23 @@ export class CorridorGenerator {
         this.drift.pillarOffset = THREE.MathUtils.clamp(this.drift.pillarOffset, -1.0, 1.0);
 
         const length = this.chunkSize;
-        const width = 6;
+        const width = this.corridorWidth;
         const height = 5 + this.drift.heightOffset; // Apply drift
 
         // Group to hold this section
         const corridor = new THREE.Group();
 
         // Floor
-        const floorGeo = new THREE.PlaneGeometry(width, length);
-        const floor = new THREE.Mesh(floorGeo, this.materials.floor);
+        const floor = new THREE.Mesh(this.geometries.floor, this.materials.floor);
         floor.rotation.x = -Math.PI / 2;
         floor.receiveShadow = true;
         floor.name = "floor"; // ID for Drown Manager
         corridor.add(floor);
 
         // Ceiling (Split for Drown Ending Effect)
-        const ceilingGeo = new THREE.PlaneGeometry(width / 2, length);
 
         // Left Ceiling
-        const ceilingL = new THREE.Mesh(ceilingGeo, this.materials.ceiling);
+        const ceilingL = new THREE.Mesh(this.geometries.ceilingHalf, this.materials.ceiling);
         ceilingL.position.set(-width / 4, height, 0); // Offset left
         ceilingL.rotation.x = Math.PI / 2;
         ceilingL.receiveShadow = true;
@@ -90,16 +107,16 @@ export class CorridorGenerator {
         corridor.add(ceilingL);
 
         // Right Ceiling
-        const ceilingR = new THREE.Mesh(ceilingGeo, this.materials.ceiling);
+        const ceilingR = new THREE.Mesh(this.geometries.ceilingHalf, this.materials.ceiling);
         ceilingR.position.set(width / 4, height, 0); // Offset right
         ceilingR.rotation.x = Math.PI / 2;
         ceilingR.receiveShadow = true;
         ceilingR.name = "ceiling_right";
         corridor.add(ceilingR);
 
-        // Walls
-        const wallGeo = new THREE.BoxGeometry(1, height, length);
-        const leftWall = new THREE.Mesh(wallGeo, this.materials.wall);
+        // Walls (unit-height geometry, scaled to this chunk's drifted height)
+        const leftWall = new THREE.Mesh(this.geometries.wall, this.materials.wall);
+        leftWall.scale.y = height;
         leftWall.position.set(-width / 2 - 0.5, height / 2, 0);
         leftWall.receiveShadow = true;
         leftWall.name = "wall";
@@ -135,7 +152,6 @@ export class CorridorGenerator {
     }
 
     createPillar(parentGroup, roomWidth, roomHeight, zPos, chunkWorldZ) {
-        const pillarGeo = new THREE.BoxGeometry(1.5, roomHeight, 2);
         const pillarMat = this.materials.wall;
 
         // DRIFT CALCULATION (Random jitter)
@@ -149,8 +165,9 @@ export class CorridorGenerator {
         const dZ1 = (Math.random() - 0.5) * this.drift.pillarOffset;
         const dZ2 = (Math.random() - 0.5) * this.drift.pillarOffset;
 
-        // Left Pillar
-        const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
+        // Left Pillar (unit-height geometry, scaled to this chunk's drifted height)
+        const leftPillar = new THREE.Mesh(this.geometries.pillar, pillarMat);
+        leftPillar.scale.y = roomHeight;
         leftPillar.position.set(-roomWidth / 2 + 0.5 + dX1, roomHeight / 2, zPos + dZ1);
         leftPillar.rotation.y = dRot1;
         leftPillar.name = "pillar";
@@ -176,28 +193,21 @@ export class CorridorGenerator {
         );
 
         // LIGHTING INTEGRATION
-        // Ask LightingManager for fixture mesh
-        const fixtureData = this.lightingManager.createLightFixture(roomWidth, roomHeight, lightZ, dX2);
-
-        // Position Mesh
-        const mesh = fixtureData.mesh;
-        mesh.position.set(roomWidth / 2 - 1.3 + dX2, roomHeight - 2, lightZ);
-        mesh.name = "light_fixture"; // ID for Drown Manager
-        parentGroup.add(mesh);
-
-        // Create Light Source
+        // Borrow a lamp from the pool rather than building a PointLight per pillar.
+        // Pooled lamps live on the scene (never inside the chunk) so that adding or
+        // removing a chunk cannot change the scene's point-light count - see the
+        // note at the top of lighting_manager.js for why that mattered so much.
+        // Positions are therefore world space: the chunk group is only offset in Z,
+        // so world X/Y equal local X/Y and world Z is local Z + chunkWorldZ.
         let intensity = 1.5 - this.drift.lightDimming;
         intensity = Math.max(0.1, intensity); // Never fully black
 
-        const pointLight = new THREE.PointLight(0xffaa00, intensity, 12);
-        pointLight.position.set(roomWidth / 2 - 2 + dX2, roomHeight - 2, lightZ);
-        pointLight.name = "light_source"; // ID for Drown Manager
+        const lightWorldZ = lightZ + chunkWorldZ;
 
-        // Register with Manager
-        this.lightingManager.registerLight(pointLight, mesh);
+        this._lampLightPos.set(roomWidth / 2 - 2 + dX2, roomHeight - 2, lightWorldZ);
+        this._lampMeshPos.set(roomWidth / 2 - 1.3 + dX2, roomHeight - 2, lightWorldZ);
 
-        pointLight.visible = true;
-        parentGroup.add(pointLight);
+        this.lightingManager.acquire(parentGroup, this._lampLightPos, this._lampMeshPos, intensity);
     }
 
     cleanupChunks(playerZ) {
@@ -213,11 +223,23 @@ export class CorridorGenerator {
         }
     }
 
+    // Tear the whole corridor down at once (mirage transition, endgame).
+    // Goes through removeChunk so pooled lamps are returned instead of orphaned
+    // still-lit in mid-air.
+    clearAll() {
+        for (let i = this.chunks.length - 1; i >= 0; i--) {
+            this.removeChunk(this.chunks[i]);
+        }
+        this.chunks.length = 0;
+        this.pillarPositions.length = 0;
+        this.lightingManager.releaseAll();
+    }
+
     removeChunk(chunk) {
         this.scene.remove(chunk);
 
-        // Notify Lighting Manager to cleanup lights from this chunk
-        this.lightingManager.removeLightsInChunk(chunk);
+        // Hand this chunk's lamps back to the pool
+        this.lightingManager.releaseChunk(chunk);
 
         // Remove from interactables
         chunk.children.forEach(child => {
