@@ -86,11 +86,15 @@ export class MetricsManager {
         // Player.js used `this.controls.getObject().rotation.y`. 
         // `controls.getObject()` usually returns the camera.
 
+        // Camera euler order is YXZ (set in Player), so .y is the true yaw. It wraps
+        // at +/-PI - which is exactly where you are when looking back - so take the
+        // shortest-arc difference, otherwise every wrap reads as a ~6 rad/frame spin.
         const currentYaw = this.camera.rotation.y;
-        // Note: Check if rotation.y has accumulated or if it's quaternion based. 
-        // PointerLockControls accumulation is usually safe to read from .rotation.
 
-        const deltaYaw = currentYaw - this.metrics.lastYaw;
+        let deltaYaw = currentYaw - this.metrics.lastYaw;
+        if (deltaYaw > Math.PI) deltaYaw -= Math.PI * 2;
+        else if (deltaYaw < -Math.PI) deltaYaw += Math.PI * 2;
+
         this.metrics.rotationSpeed = Math.abs(deltaYaw) / delta;
         this.metrics.lastYaw = currentYaw;
 

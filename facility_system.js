@@ -510,19 +510,26 @@ export class FacilitySystem {
 
                 // Smoothly lerp or just set? Set is jittery, usually fine for horror.
                 // Let's use a sine wave for "breathing" the twist if long duration
+                // NOTE: we hand the angle to CameraController instead of writing
+                // camera.rotation.z here. CameraController runs later in the frame and
+                // used to stomp this value (or get blocked by its own guard), so the
+                // twist fought the sway every frame.
+                let rollZ;
                 if (this.cameraInversion.duration > 1.0) {
                     // Easing in/out
                     const progress = this.cameraInversion.timer / this.cameraInversion.duration;
                     const wave = Math.sin(progress * Math.PI); // 0 -> 1 -> 0
-                    this.player.camera.rotation.z = currentAngle * wave;
+                    rollZ = currentAngle * wave;
                 } else {
-                    this.player.camera.rotation.z = currentAngle;
+                    rollZ = currentAngle;
                 }
 
                 if (this.cameraInversion.timer > this.cameraInversion.duration) {
                     this.cameraInversion.active = false;
-                    this.player.camera.rotation.z = 0;
+                    rollZ = 0;
                 }
+
+                if (this.player.cameraController) this.player.cameraController.setExternalRoll(rollZ);
 
             } else {
                 // TRIGGER LOGIC
@@ -549,7 +556,15 @@ export class FacilitySystem {
                         this.cameraInversion.duration = 0.2 + (Math.random() * (pFactor * 4.0));
                     }
                 }
+
+                if (this.player.cameraController) this.player.cameraController.setExternalRoll(0);
             }
+        } else if (this.cameraInversion.active) {
+            // Paranoia dropped out of the twist band mid-event: cancel cleanly instead
+            // of leaving the roll frozen at its last value.
+            this.cameraInversion.active = false;
+            this.cameraInversion.timer = 0;
+            if (this.player.cameraController) this.player.cameraController.setExternalRoll(0);
         }
     }
 
@@ -895,6 +910,7 @@ export class FacilitySystem {
 
         this.cameraInversion.active = false;
         this.cameraInversion.timer = 0;
+        if (this.player.cameraController) this.player.cameraController.setExternalRoll(0);
         this.player.camera.rotation.z = 0; // Fix rotation
         if (this.player.setViewLocked) this.player.setViewLocked(false);
 

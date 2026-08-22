@@ -8,6 +8,11 @@ export class CameraController {
 
         this.fovSurge = { active: false, timer: 0 };
         this.externalShake = 0;
+
+        // Roll (radians) requested by other systems (e.g. FacilitySystem's camera
+        // inversion). Routed through here so this class is the ONLY writer of
+        // camera.rotation.z - two writers per frame used to fight each other.
+        this.externalRoll = 0;
     }
 
     reset() {
@@ -15,6 +20,7 @@ export class CameraController {
         this.fovSurge.active = false;
         this.fovSurge.timer = 0;
         this.externalShake = 0;
+        this.externalRoll = 0;
 
         // Force Camera Reset
         this.camera.rotation.z = 0;
@@ -63,23 +69,29 @@ export class CameraController {
         let totalRotZ = sway;
 
         // 3. EXTERNAL SHAKE (Look Back / Trauma)
+        // Roll jitter only. The old code also nudged camera.position.x/y here and
+        // never subtracted the nudge again, so the camera random-walked sideways
+        // for as long as the shake lasted (invisible per frame, ~25cm over 20s).
         if (this.externalShake > 0) {
-            const s = this.externalShake;
-            // Random jitter
-            totalRotZ += (Math.random() - 0.5) * s * 0.5;
-            // Also apply slight XY offset for violent shake?
-            this.camera.position.x += (Math.random() - 0.5) * s * 0.05;
-            this.camera.position.y += (Math.random() - 0.5) * s * 0.05;
+            totalRotZ += (Math.random() - 0.5) * this.externalShake * 0.5;
         }
 
-        // Only apply if there's actual paranoia/sway (Allows free cam otherwise)
-        if ((pFactor > 0.01 || this.externalShake > 0) && Math.abs(this.camera.rotation.z) < 0.5) {
-            this.camera.rotation.z = totalRotZ;
-        }
+        // 4. EXTERNAL ROLL (Camera Inversion / Twist events)
+        totalRotZ += this.externalRoll;
+
+        // Written unconditionally. camera.rotation uses YXZ order (set in Player),
+        // so .z is a pure local roll that cannot bleed into yaw/pitch. The old
+        // `Math.abs(camera.rotation.z) < 0.5` guard existed to paper over the
+        // default XYZ order, where .z held a decomposition artifact rather than roll.
+        this.camera.rotation.z = totalRotZ;
     }
 
     setShake(intensity) {
         this.externalShake = intensity;
+    }
+
+    setExternalRoll(angle) {
+        this.externalRoll = angle;
     }
 
     // Moved Bobbing Logic here as well? 

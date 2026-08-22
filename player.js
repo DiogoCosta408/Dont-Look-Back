@@ -9,8 +9,29 @@ export class Player {
         this.camera = camera;
         this.domElement = domElement;
 
+        // [EULER ORDER - IMPORTANT]
+        // PointerLockControls composes and decomposes orientation with a YXZ Euler,
+        // but Object3D defaults to XYZ. Under XYZ, camera.rotation.z is NOT roll once
+        // you are yawed away from forward: it holds atan2(-sin(yaw)*sin(pitch), cos(yaw)),
+        // a decomposition artifact. Our roll effects (sway / shake / inversion) wrote
+        // small values into that slot, which does not tilt the camera by that amount -
+        // it REPLACES the artifact, tilting the horizon by however far the artifact had
+        // drifted. Yaw and pitch survive; the horizon does not. With 12 deg of pitch the
+        // real roll reached 13 deg at a quarter turn, 40 deg at 75 deg, and a full flip
+        // past 90 deg - i.e. the view rolled further the further you turned back, which
+        // is why running backwards to the mirage door was the worst case.
+        // Matching the order makes .z an honest local roll.
+        camera.rotation.order = 'YXZ';
+
         // [CONTROLS]
         this.controls = new PointerLockControls(camera, domElement);
+
+        // Keep pitch a hair off the poles. YXZ decomposition is degenerate at exactly
+        // +/-90 deg pitch (yaw and roll collapse), which would snap the view sideways
+        // if a roll effect was active while looking straight up or down.
+        this.controls.minPolarAngle = 0.01;
+        this.controls.maxPolarAngle = Math.PI - 0.01;
+
         this.setupEventListeners();
 
         // [MODULES]
