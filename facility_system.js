@@ -8,9 +8,9 @@
 const BLACKOUT_RATE_PER_SEC = 1 / 150;
 const BLACKOUT_COOLDOWN = 90;
 
-// Flicker: the ambient version of the same idea. Silent below moderate-high
-// paranoia, then ramps from an occasional stutter to a steady crackle at max.
-const FLICKER_MIN_PARANOIA = 0.55;
+// Flicker: the ambient version of the same idea. Silent while the player is calm,
+// then ramps from an occasional stutter to a steady crackle at max paranoia.
+const FLICKER_MIN_PARANOIA = 0.20;
 const FLICKER_RATE_MIN = 0.15; // ~1 per 7s at the threshold
 const FLICKER_RATE_MAX = 1.5;  // matches the old peak rate at max paranoia
 
@@ -503,9 +503,9 @@ export class FacilitySystem {
         }
 
         // 2. LIGHT FLICKERING
-        // Only from moderate-high paranoia upward, ramping to full rate at max.
-        // Below the threshold the corridor stays steady, so a flicker actually reads
-        // as the facility reacting to the player rather than as constant noise.
+        // Starts once paranoia is off the floor, ramping to full rate at max. Below
+        // the threshold the corridor stays steady, so the first flicker reads as the
+        // facility reacting to the player rather than as constant background noise.
         if (pFactor >= FLICKER_MIN_PARANOIA) {
             const ramp = (pFactor - FLICKER_MIN_PARANOIA) / (1 - FLICKER_MIN_PARANOIA);
             const flickerRate = FLICKER_RATE_MIN + ramp * (FLICKER_RATE_MAX - FLICKER_RATE_MIN);
