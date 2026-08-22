@@ -101,8 +101,8 @@ export class DrownManager {
                 '#include <map_fragment>',
                 `// Near-black navy. The scene is lit only by a distant pyramid, so the
                  // surface should sit barely above the fog rather than glow.
-                 vec3 deepCol  = vec3(0.0030, 0.0080, 0.0190);
-                 vec3 crestCol = vec3(0.0110, 0.0250, 0.0480);
+                 vec3 deepCol  = vec3(0.0012, 0.0032, 0.0080);
+                 vec3 crestCol = vec3(0.0045, 0.0105, 0.0210);
 
                  // Biased low: vWaveH is the raw wave sum (~ -1.34..1.34), and mapping
                  // the midpoint well below halfway keeps most of the sheet at deepCol
@@ -115,10 +115,10 @@ export class DrownManager {
                  float chop = sin(dot(vSurf, vec2( 0.87,  0.49)) * 0.85 + uTime * 0.75)
                             + sin(dot(vSurf, vec2(-0.42,  0.91)) * 1.30 - uTime * 0.55)
                             + sin(dot(vSurf, vec2( 0.63, -0.78)) * 1.90 + uTime * 0.95);
-                 surf += chop * 0.0016;
+                 surf += chop * 0.0007;
 
                  // A faint lift on the highest crests - the only light left out here.
-                 surf += smoothstep(1.05, 1.32, vWaveH) * 0.012;
+                 surf += smoothstep(1.05, 1.32, vWaveH) * 0.005;
 
                  diffuseColor.rgb *= surf;`
             );
