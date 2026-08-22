@@ -33,6 +33,32 @@ export class MovementController {
         this.enabled = true;
     }
 
+    // Move the player on a basis derived from YAW ALONE.
+    //
+    // PointerLockControls.moveForward/moveRight build their axes from the camera's
+    // local X column, so any cosmetic roll (paranoia sway, look-back shake, the
+    // inversion twist) swings the movement axes along with the horizon. At the ~38
+    // deg peak roll that veered "hold W" up to 38 deg off course - worse the further
+    // you were pitched - cost up to 20% of your speed, and leaked 60% of a strafe
+    // straight up. Because the twist eases in and out on a sine wave, the heading
+    // swung mid-run, so in a corridor that looks identical in both directions it read
+    // as the controls turning against the player. Roll is a visual effect; it must
+    // never steer.
+    //
+    // Yaw is read from camera.rotation.y, which is exact because the camera uses YXZ
+    // order (see Player) - roll and pitch cannot bleed into it. At zero roll this is
+    // identical to what PointerLockControls did, so normal walking is unchanged.
+    applyMove(right, forward) {
+        const yaw = this.camera.rotation.y;
+        const sy = Math.sin(yaw);
+        const cy = Math.cos(yaw);
+
+        // forward = (-sin yaw, 0, -cos yaw)   right = (cos yaw, 0, -sin yaw)
+        const pos = this.controls.getObject().position;
+        pos.x += (forward * -sy) + (right * cy);
+        pos.z += (forward * -cy) - (right * sy);
+    }
+
     update(delta, isEndgame, blackHolePos, edgeZ, isIntro = false, pillarPositions = [], mirageZ = null) {
         // Clamp delta
         const timeStep = Math.min(delta, 0.1);
@@ -61,8 +87,7 @@ export class MovementController {
             if (this.moveLeft || this.moveRight)
                 this.velocity.x -= this.direction.x * this.acceleration * timeStep;
 
-            this.controls.moveRight(-this.velocity.x * timeStep);
-            this.controls.moveForward(-this.velocity.z * timeStep);
+            this.applyMove(-this.velocity.x * timeStep, -this.velocity.z * timeStep);
         }
 
         // [INTRO ROOM COLLISION]
