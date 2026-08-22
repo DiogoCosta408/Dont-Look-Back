@@ -194,6 +194,10 @@ export class DebugHUD {
             + this._flag(pFactor > 0.95, ' blackout/twist(95%)'));
 
         if (sys) {
+            const mult = sys.calmMultiplier || 1;
+            L.push('calm        ' + (sys.calmTimer || 0).toFixed(1) + 's'
+                + '   decay x' + mult.toFixed(2)
+                + (mult > 1 ? (mult >= 2.99 ? '  MAX' : '  ramping') : ''));
             L.push('lookBackT   ' + (sys.lookBackTimer || 0).toFixed(1) + 's'
                 + '   apathy ' + (sys.apathyLevel || 0));
             L.push('voidDist    ' + (sys.highParanoiaDistance || 0).toFixed(0)

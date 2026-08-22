@@ -17,6 +17,18 @@ const FLICKER_RATE_MAX = 1.5;  // matches the old peak rate at max paranoia
 // Scales down to 0 at FLICKER_MIN_PARANOIA, so low-paranoia flickers never repeat.
 const FLICKER_CHAIN_MAX = 0.7;
 
+// [CALM RECOVERY]
+// Standing still and staring down the corridor is the one way to actively settle.
+// Recovery runs at the normal rate for the first CALM_RAMP_DELAY seconds, then
+// eases up to CALM_MAX_MULTIPLIER over CALM_RAMP_RAMP seconds of holding it.
+// Facing counts as forward while the camera's forward Z is below the threshold,
+// i.e. within ~60 degrees of straight ahead - deliberately stricter than merely
+// "not looking back", so you have to actually settle rather than stand sideways.
+const CALM_FACING_THRESHOLD = -0.5;
+const CALM_RAMP_DELAY = 20.0;
+const CALM_RAMP_RAMP = 15.0;   // reaches full speed at 35s of holding still
+const CALM_MAX_MULTIPLIER = 3.0;
+
 export class FacilitySystem {
     constructor(player, environment, uiElements) {
         this.player = player;
@@ -48,6 +60,11 @@ export class FacilitySystem {
         };
         // Seconds still to wait before another blackout may be rolled.
         this.blackoutCooldown = 0;
+
+        // Uninterrupted seconds spent still AND facing forward, and the recovery
+        // speed-up it has earned. See the CALM_* constants.
+        this.calmTimer = 0;
+        this.calmMultiplier = 1.0;
 
         // Timer Logic
         this.survivalTime = 0;
@@ -361,11 +378,30 @@ export class FacilitySystem {
             this.paranoiaLevel += delta * 1.2;
         }
 
+        // [CALM TIMER]
+        // How long the player has held still AND kept facing down the corridor.
+        // Any movement, or turning away from forward, drops it straight back to 0 -
+        // the acceleration has to be earned in one continuous stretch.
+        const facingForward = p.forwardZ < CALM_FACING_THRESHOLD;
+        if (p.isStationary && facingForward) {
+            this.calmTimer += delta;
+        } else {
+            this.calmTimer = 0;
+        }
+
+        this.calmMultiplier = 1.0;
+        if (this.calmTimer > CALM_RAMP_DELAY) {
+            const ramp = Math.min(1.0, (this.calmTimer - CALM_RAMP_DELAY) / CALM_RAMP_RAMP);
+            this.calmMultiplier = 1.0 + ramp * (CALM_MAX_MULTIPLIER - 1.0);
+        }
+
         // [DECAY - RECOVERY]
         // Only recover if NOT Looking Back AND (Stationary OR Careful Walking)
         if (!p.isLookingBack) {
             if (p.isStationary) {
-                this.paranoiaLevel -= delta * 0.5; // Slow recovery when still
+                // Standing still and facing forward compounds: the longer it is held,
+                // the faster the fear drains, up to CALM_MAX_MULTIPLIER.
+                this.paranoiaLevel -= delta * 0.5 * this.calmMultiplier;
             } else if (p.continuousForwardTime < 5.0) {
                 this.paranoiaLevel -= delta * 0.5; // Slow recovery while walking
             }
@@ -931,6 +967,8 @@ export class FacilitySystem {
         this.blackout.active = false;
         this.blackout.timer = 0;
         this.blackoutCooldown = 0;
+        this.calmTimer = 0;
+        this.calmMultiplier = 1.0;
         this.environment.forceBlackout = false;
 
         if (this._currentWhisper) {

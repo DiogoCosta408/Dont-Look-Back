@@ -10,6 +10,10 @@ export class MetricsManager {
             continuousForwardTime: 0,
             isStationary: false,
             isLookingBack: false,
+            // Z of the camera's forward vector: -1 is straight down the corridor,
+            // 0 is side-on, +1 is straight back. Lets callers ask for "facing
+            // forward" with their own tolerance, not just "not facing backward".
+            forwardZ: -1,
             zoneHistory: [],
             gazeTarget: null,
             gazeDuration: 0,
@@ -115,6 +119,7 @@ export class MetricsManager {
 
             // Continuous State: Looking Back if Z > 0 (Positive)
             this.metrics.isLookingBack = z > 0;
+            this.metrics.forwardZ = z;
 
             // Spike Trigger: Positive -> Negative
             if (this._lastForwardZ > 0 && z <= 0) {
@@ -128,6 +133,7 @@ export class MetricsManager {
         } catch (e) {
             this.metrics.isLookingBack = false;
             this.metrics.turnAroundTrigger = false;
+            this.metrics.forwardZ = -1;
         }
 
         // Keep rotation speed metric for other uses
