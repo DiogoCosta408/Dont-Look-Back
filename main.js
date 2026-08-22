@@ -7,7 +7,7 @@ import { FacilityGenerator } from './environment.js';
 import { FacilitySystem } from './facility_system.js';
 import { AudioSystem } from './audio_system.js';
 import { EndingTracker } from './system_modules/EndingTracker.js';
-import { PerfMonitor } from './system_modules/PerfMonitor.js';
+import { DebugHUD } from './system_modules/DebugHUD.js';
 
 console.log("FACILITY_OS: CORE SYSTEM INITIALIZED");
 
@@ -139,8 +139,8 @@ class GameClient {
         // CRITICAL: Add Controls to Scene to ensure World Matrix updates correctly
         this.scene.add(this.player.controls.getObject());
 
-        // Frame-time / shader-recompile instrumentation (F3 to show)
-        this.perf = new PerfMonitor();
+        // Debug overlay: paranoia, visual/SFX state, frame timing (F3 to show)
+        this.debug = new DebugHUD();
 
         this.startIntro();
         this.animate();
@@ -452,10 +452,9 @@ class GameClient {
 
         // --- GAME LOOP ---
         // Global updates (Logic handled by Facade/System internally)
-        const chunksBefore = this.generator.corridor.chunks.length;
         const genStart = performance.now();
         this.generator.update(this.player.controls.getObject().position.z, delta);
-        if (this.perf) this.perf.noteGeneration(performance.now() - genStart, chunksBefore);
+        if (this.debug) this.debug.noteGeneration(performance.now() - genStart);
 
         // Single Audio Update
         if (!this.generator.drownManager || !this.generator.drownManager.active) {
@@ -528,7 +527,7 @@ class GameClient {
         // this.renderer.render(this.scene, this.camera);
         this.composer.render();
 
-        if (this.perf) this.perf.endFrame(this.renderer, this.generator);
+        if (this.debug) this.debug.endFrame(this);
     }
 
 

@@ -21,6 +21,26 @@ import * as THREE from '../three.module.js';
 // a 20-long chunk) carry a lamp = 21. 24 leaves headroom.
 const LAMP_POOL_SIZE = 24;
 
+// [FLICKER BURST]
+// A flicker is a STROBE, not a dip: the affected lamps snap hard off and on
+// several times over a fraction of a second, then settle back lit. Intensity is
+// set directly (no lerp) while a burst runs, otherwise the smooth restore in
+// update() would round the edges off into a fade.
+// Timings are deliberately uneven so it reads as bad wiring rather than a clean
+// square wave: dropouts are short and sharp, recoveries are longer and ragged,
+// and a recovery sometimes comes back at a sagged voltage before catching properly.
+const FLICKER_BURST_MIN = 0.12;  // shortest burst, seconds
+const FLICKER_BURST_MAX = 0.45;
+const FLICKER_OFF_MIN = 0.015;   // a dropout is brief
+const FLICKER_OFF_MAX = 0.055;
+const FLICKER_ON_MIN = 0.025;    // the recovery between dropouts is longer, and varies more
+const FLICKER_ON_MAX = 0.120;
+const FLICKER_SAG_CHANCE = 0.35; // chance a mid-burst recovery is a brownout, not full
+const FLICKER_SAG_MIN = 0.20;    // brownout level, as a fraction of the lamp's normal output
+const FLICKER_SAG_MAX = 0.60;
+const FLICKER_LAMP_SHARE = 0.35; // fraction of live lamps caught in a burst
+const FLICKER_CHAIN_DECAY = 0.6; // each chained burst is less likely than the last
+
 export class LightingManager {
     constructor(scene) {
         this.scene = scene;
@@ -54,6 +74,17 @@ export class LightingManager {
         this.freeLamps = [];
         this._warnedExhausted = false;
 
+        // Active flicker burst. See flickerLights() / _updateFlicker().
+        this.flicker = {
+            active: false,
+            timer: 0,
+            duration: 0,
+            toggleTimer: 0,
+            lit: true,
+            chainChance: 0,
+            lamps: []
+        };
+
         this.initPool();
     }
 
@@ -74,7 +105,7 @@ export class LightingManager {
             light.userData.originalIntensity = 0;
             this.scene.add(light); // added once, never removed, never hidden
 
-            const lamp = { light, mesh, material, owner: null };
+            const lamp = { light, mesh, material, owner: null, flickering: false };
             light.userData.lamp = lamp;
 
             this.lamps.push(lamp);
@@ -115,6 +146,13 @@ export class LightingManager {
     release(lamp) {
         if (!lamp.owner) return;
 
+        // A chunk can be culled mid-burst; drop the lamp out of it cleanly.
+        if (lamp.flickering) {
+            lamp.flickering = false;
+            const fIdx = this.flicker.lamps.indexOf(lamp);
+            if (fIdx > -1) this.flicker.lamps.splice(fIdx, 1);
+        }
+
         lamp.owner = null;
         lamp.light.intensity = 0;
         lamp.light.userData.originalIntensity = 0;
@@ -148,6 +186,7 @@ export class LightingManager {
 
     update(delta) {
         if (this.forceBlackout) {
+            this.cancelFlicker();
             this.lights.forEach(light => {
                 light.intensity = 0;
                 if (light.userData.mesh) light.userData.mesh.visible = false;
@@ -155,8 +194,12 @@ export class LightingManager {
             return;
         }
 
-        // Continuous restoration of lights
+        // Continuous restoration of lights.
+        // Lamps inside a flicker burst are skipped: the burst drives them directly
+        // so the off/on edges stay hard instead of being lerped into a fade.
         this.lights.forEach(light => {
+            if (light.userData.lamp && light.userData.lamp.flickering) return;
+
             if (light.userData.originalIntensity) {
                 // Smoothly return to original intensity
                 light.intensity = THREE.MathUtils.lerp(light.intensity, light.userData.originalIntensity, delta * 5.0);
@@ -175,35 +218,102 @@ export class LightingManager {
                 }
             }
         });
+
+        this._updateFlicker(delta);
     }
 
-    flickerLights() {
+    // Start a flicker burst: a handful of lamps cut out and come back several
+    // times in quick succession, like a bad connection arcing.
+    //
+    // chainChance is the probability that another burst fires the instant this one
+    // settles, and it decays with each link so a chain always terminates. The caller
+    // scales it with paranoia: at low paranoia it is 0, so a flicker happens once
+    // and is over; high paranoia is what makes them come one after another.
+    flickerLights(chainChance = 0) {
         if (this.forceBlackout) return;
 
-        // Aggressively dim or boost lights
-        this.lights.forEach(light => {
-            if (Math.random() < 0.3) { // 30% of lights affected per call
-                // Random intensity
-                const mult = Math.random() < 0.5 ? 0.0 : (0.1 + Math.random() * 1.1); // 50% chance of FULL BLACK
+        // Never restart a burst on top of a running one - that would clip the
+        // rhythm and, at high paranoia, smear into a continuous strobe.
+        if (this.flicker.active) return;
 
-                light.intensity = light.userData.originalIntensity * mult;
+        const burst = this.flicker;
+        burst.lamps.length = 0;
 
-                // Update Mesh
-                if (light.userData.mesh) {
-                    const mesh = light.userData.mesh;
-                    const mat = mesh.material;
-                    if (mult < 0.05) {
-                        // TURN BLACK - HIDE MESH
-                        mesh.visible = false;
-                        mat.emissiveIntensity = 0;
-                    } else {
-                        // Dim
-                        mesh.visible = true;
-                        mat.emissiveIntensity = 2.0 * mult;
-                    }
-                }
+        for (const lamp of this.lamps) {
+            if (lamp.owner && Math.random() < FLICKER_LAMP_SHARE) {
+                lamp.flickering = true;
+                burst.lamps.push(lamp);
             }
-        });
+        }
+
+        if (burst.lamps.length === 0) return;
+
+        burst.active = true;
+        burst.timer = 0;
+        burst.duration = FLICKER_BURST_MIN + Math.random() * (FLICKER_BURST_MAX - FLICKER_BURST_MIN);
+        burst.chainChance = chainChance;
+
+        // Open on a dropout so the burst starts on the noticeable edge.
+        this._setBurstLevel(0);
+        burst.lit = false;
+        burst.toggleTimer = FLICKER_OFF_MIN + Math.random() * (FLICKER_OFF_MAX - FLICKER_OFF_MIN);
+    }
+
+    // level is a fraction of each lamp's normal output: 0 = dead, 1 = full.
+    _setBurstLevel(level) {
+        const on = level > 0.01;
+
+        for (const lamp of this.flicker.lamps) {
+            lamp.light.intensity = lamp.light.userData.originalIntensity * level;
+            lamp.mesh.visible = on;
+            lamp.material.emissiveIntensity = on ? 2.0 * level : 0;
+        }
+    }
+
+    _updateFlicker(delta) {
+        const burst = this.flicker;
+        if (!burst.active) return;
+
+        burst.timer += delta;
+        burst.toggleTimer -= delta;
+
+        if (burst.toggleTimer <= 0) {
+            burst.lit = !burst.lit;
+
+            if (burst.lit) {
+                // Coming back - sometimes only partway, as if the voltage is sagging.
+                const level = Math.random() < FLICKER_SAG_CHANCE
+                    ? FLICKER_SAG_MIN + Math.random() * (FLICKER_SAG_MAX - FLICKER_SAG_MIN)
+                    : 1.0;
+                this._setBurstLevel(level);
+                burst.toggleTimer = FLICKER_ON_MIN + Math.random() * (FLICKER_ON_MAX - FLICKER_ON_MIN);
+            } else {
+                this._setBurstLevel(0);
+                burst.toggleTimer = FLICKER_OFF_MIN + Math.random() * (FLICKER_OFF_MAX - FLICKER_OFF_MIN);
+            }
+        }
+
+        if (burst.timer < burst.duration) return;
+
+        // Settle: always end fully lit, and hand the lamps back to the smooth
+        // restore path in update().
+        this._setBurstLevel(1.0);
+        for (const lamp of burst.lamps) lamp.flickering = false;
+        burst.lamps.length = 0;
+        burst.active = false;
+
+        if (Math.random() < burst.chainChance) {
+            this.flickerLights(burst.chainChance * FLICKER_CHAIN_DECAY);
+        }
+    }
+
+    cancelFlicker() {
+        const burst = this.flicker;
+        if (!burst.active) return;
+
+        for (const lamp of burst.lamps) lamp.flickering = false;
+        burst.lamps.length = 0;
+        burst.active = false;
     }
 
     toggleBackLights(playerPositionZ, state) {

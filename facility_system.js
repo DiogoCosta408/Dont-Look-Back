@@ -13,6 +13,9 @@ const BLACKOUT_COOLDOWN = 90;
 const FLICKER_MIN_PARANOIA = 0.20;
 const FLICKER_RATE_MIN = 0.15; // ~1 per 7s at the threshold
 const FLICKER_RATE_MAX = 1.5;  // matches the old peak rate at max paranoia
+// Chance that a burst is immediately followed by another, at max paranoia.
+// Scales down to 0 at FLICKER_MIN_PARANOIA, so low-paranoia flickers never repeat.
+const FLICKER_CHAIN_MAX = 0.7;
 
 export class FacilitySystem {
     constructor(player, environment, uiElements) {
@@ -511,7 +514,12 @@ export class FacilitySystem {
             const flickerRate = FLICKER_RATE_MIN + ramp * (FLICKER_RATE_MAX - FLICKER_RATE_MIN);
 
             if (Math.random() < flickerRate * delta) {
-                if (this.environment.flickerLights) this.environment.flickerLights();
+                // Paranoia buys two things: bursts more often (rate above), and a
+                // chance of another burst firing the moment this one settles. At the
+                // threshold the chain chance is 0, so a low-paranoia flicker happens
+                // once and is done.
+                const chainChance = ramp * FLICKER_CHAIN_MAX;
+                if (this.environment.flickerLights) this.environment.flickerLights(chainChance);
             }
         }
 

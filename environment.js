@@ -136,8 +136,8 @@ export class FacilityGenerator {
         this.corridor.setDriftIntensity(intensity);
     }
 
-    flickerLights() {
-        this.lighting.flickerLights();
+    flickerLights(chainChance = 0) {
+        this.lighting.flickerLights(chainChance);
     }
 
     toggleBackLights(z, state) {
