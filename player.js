@@ -52,7 +52,7 @@ export class Player {
         });
     }
 
-    update(delta, interactables = [], pillarPositions = [], pFactor = 0, isEndgame = false, blackHolePos = null, edgeZ = null, isIntro = false, mirageZ = null) {
+    update(delta, interactables = [], pillarPositions = [], pFactor = 0, isEndgame = false, blackHolePos = null, edgeZ = null, isIntro = false, mirageZ = null, roomColliders = null) {
         if (!this.controls.isLocked) return;
 
         // [VIEW LOCK Constraint]
@@ -75,7 +75,7 @@ export class Player {
         }
 
         // 1. Movement & Physics
-        this.movement.update(delta, isEndgame, blackHolePos, edgeZ, isIntro, pillarPositions, mirageZ);
+        this.movement.update(delta, isEndgame, blackHolePos, edgeZ, isIntro, pillarPositions, mirageZ, roomColliders);
 
         // 2. Behavior Tracking
         const inputs = {

@@ -58,6 +58,14 @@ export class FacilityGenerator {
         return this.lighting.lights;
     }
 
+    // Furniture colliders for whichever room the player is standing in. Intro and
+    // mirage are never both live, so the first one with a built room wins.
+    getRoomColliders() {
+        if (this.intro && this.intro.roomGroup) return this.intro.getColliders();
+        if (this.mirage && this.mirage.roomGroup) return this.mirage.getColliders();
+        return null;
+    }
+
     // Aggregates interactables from all sources
     get interactables() {
         return [

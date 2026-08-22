@@ -14,6 +14,41 @@ export class IntroRoom {
         // Light references for flicker
         this.introLight = null;
         this.introLightPanel = null;
+
+        // [FURNITURE COLLISION]
+        // Solid furniture the player should bump into, in ROOM-LOCAL space. Boxes
+        // are { x, z, halfX, halfZ }, posts are { x, z, radius }. Kept local and
+        // offset by roomGroup.position on read, because the mirage room is shifted
+        // in Z during the seamless loop transition - world coords would go stale.
+        this.colliders = [];
+        this._worldColliders = [];
+    }
+
+    addBoxCollider(x, z, halfX, halfZ) {
+        this.colliders.push({ x, z, halfX, halfZ });
+        this._worldColliders.push({ x, z, halfX, halfZ });
+    }
+
+    addPostCollider(x, z, radius) {
+        this.colliders.push({ x, z, radius });
+        this._worldColliders.push({ x, z, radius });
+    }
+
+    // Colliders in world space. The returned array is reused between calls.
+    getColliders() {
+        if (!this.roomGroup) return null;
+
+        const ox = this.roomGroup.position.x;
+        const oz = this.roomGroup.position.z;
+
+        for (let i = 0; i < this.colliders.length; i++) {
+            const local = this.colliders[i];
+            const world = this._worldColliders[i];
+            world.x = local.x + ox;
+            world.z = local.z + oz;
+        }
+
+        return this._worldColliders;
     }
 
     create(positionOffset = new THREE.Vector3(0, 0, 4), autoStartClock = true, isMirage = false, backEndingCount = 0) {
@@ -228,6 +263,10 @@ export class IntroRoom {
     createFurnishings(texLoader, frameTex, frameMat, isMirage = false, variantLevel = 0) {
         console.log("SYS: createFurnishings variantLevel:", variantLevel);
 
+        // Rebuilt from scratch each time - variants furnish the room differently.
+        this.colliders.length = 0;
+        this._worldColliders.length = 0;
+
         // VARIANT 2: Simple Wooden Chair ONLY
         if (variantLevel === 2) {
             const chairGroup = new THREE.Group();
@@ -272,6 +311,9 @@ export class IntroRoom {
             const s2 = new THREE.Mesh(slatGeo, woodMat);
             s2.position.set(0, 0.85, 0.2);
             chairGroup.add(s2);
+
+            // Chair footprint: legs sit at +/-0.2, seat is 0.5 square.
+            this.addBoxCollider(0, 0.5, 0.25, 0.25);
 
             return; // EXIT early, no sofa/table
         }
@@ -328,6 +370,10 @@ export class IntroRoom {
             arm.position.set(0, 0.2 + 0.25 + 0.075, zPos);
             sofaGroup.add(arm);
         });
+
+        // Sofa footprint: arms are the widest part (0.69 deep, so +/-0.345) and reach
+        // z = +/-0.925 with their own 0.075 half-depth.
+        this.addBoxCollider(-1.4, 0.5, 0.345, 1.0);
 
         // --- TABLE ---
         let tableTexPath = 'textures/table_texture.png';
@@ -420,6 +466,11 @@ export class IntroRoom {
             const lampGroup = new THREE.Group();
             lampGroup.position.set(-1.6, 0.0, -1.4);
 
+            // 0. Base - round disk on the floor, centred under the stem.
+            const lBase = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.025, 32), lBlack);
+            lBase.position.y = 0.0125; // sits ON the floor, not through it
+            lampGroup.add(lBase);
+
             // 1. Stem
             const lStem = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.4), lBlack);
             lStem.position.y = 0.7;
@@ -448,6 +499,10 @@ export class IntroRoom {
             lampGroup.add(lSpot.target);
 
             this.roomGroup.add(lampGroup);
+
+            // Lamp post: collide against the base disk, which is the widest part
+            // at floor level.
+            this.addPostCollider(-1.6, -1.4, 0.16);
         }
     }
 

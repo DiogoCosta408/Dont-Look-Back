@@ -447,7 +447,8 @@ class GameClient {
             bhPos,
             this.generator.corridorEndZ,
             (this.currentZone === 'INTRO'), // Pass isIntro flag
-            mirageZ // Pass mirageZ
+            mirageZ, // Pass mirageZ
+            this.generator.getRoomColliders() // Sofa / chair / lamp collision
         );
 
         // --- GAME LOOP ---

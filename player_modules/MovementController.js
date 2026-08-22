@@ -31,6 +31,9 @@ export class MovementController {
 
         this.isFalling = false;
         this.enabled = true;
+
+        // Player's horizontal footprint, used against room furniture.
+        this.bodyRadius = 0.25;
     }
 
     // Move the player on a basis derived from YAW ALONE.
@@ -59,7 +62,57 @@ export class MovementController {
         pos.z += (forward * -cy) - (right * sy);
     }
 
-    update(delta, isEndgame, blackHolePos, edgeZ, isIntro = false, pillarPositions = [], mirageZ = null) {
+    // Push the player out of any room furniture they have walked into.
+    // Colliders are world-space, from IntroRoom.getColliders(): boxes carry
+    // halfX/halfZ, posts carry radius. Resolution is along the shallower axis so
+    // brushing past a sofa slides along it instead of shoving you around its end.
+    resolveFurniture(playerPos, colliders) {
+        if (!colliders) return;
+
+        const r = this.bodyRadius;
+
+        for (const c of colliders) {
+            if (c.radius !== undefined) {
+                const dx = playerPos.x - c.x;
+                const dz = playerPos.z - c.z;
+                const reach = c.radius + r;
+                const distSq = dx * dx + dz * dz;
+
+                if (distSq >= reach * reach) continue;
+
+                const dist = Math.sqrt(distSq);
+                if (dist < 1e-5) {
+                    // Dead centre - pick an arbitrary direction rather than divide by ~0
+                    playerPos.x += reach;
+                    this.velocity.x = 0;
+                    continue;
+                }
+
+                const push = (reach - dist) / dist;
+                playerPos.x += dx * push;
+                playerPos.z += dz * push;
+                this.velocity.x = 0;
+                this.velocity.z = 0;
+                continue;
+            }
+
+            const overlapX = (c.halfX + r) - Math.abs(playerPos.x - c.x);
+            if (overlapX <= 0) continue;
+
+            const overlapZ = (c.halfZ + r) - Math.abs(playerPos.z - c.z);
+            if (overlapZ <= 0) continue;
+
+            if (overlapX < overlapZ) {
+                playerPos.x += (playerPos.x < c.x ? -overlapX : overlapX);
+                this.velocity.x = 0;
+            } else {
+                playerPos.z += (playerPos.z < c.z ? -overlapZ : overlapZ);
+                this.velocity.z = 0;
+            }
+        }
+    }
+
+    update(delta, isEndgame, blackHolePos, edgeZ, isIntro = false, pillarPositions = [], mirageZ = null, roomColliders = null) {
         // Clamp delta
         const timeStep = Math.min(delta, 0.1);
         const playerPos = this.controls.getObject().position;
@@ -98,6 +151,7 @@ export class MovementController {
             if (playerPos.z < 2.2) {
                 if (Math.abs(playerPos.x) > 0.6) playerPos.z = 2.2;
             }
+            this.resolveFurniture(playerPos, roomColliders);
             return;
         }
 
@@ -120,6 +174,8 @@ export class MovementController {
                 // If trying to walk out the door, constrain X (door frame)
                 if (Math.abs(playerPos.x) > 0.6) playerPos.z = doorZ;
             }
+
+            this.resolveFurniture(playerPos, roomColliders);
             // Do NOT return here if we want standard corridor physics to apply partially? 
             // In Intro we return to skip regular walking limits?
             // "Regular walking" limits x to 2.5 (line 175). Mirage/Intro is narrower (1.8).
